@@ -5,6 +5,7 @@ module.exports = {
       params: {
         venv: "env",
         message: [
+          "git config --global --add safe.directory '*'",
           "git clone -b sd3 https://github.com/kohya-ss/sd-scripts"
         ]
       }
