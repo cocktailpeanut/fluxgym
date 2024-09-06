@@ -20,6 +20,8 @@ Dead simple web UI for training FLUX LoRA **with LOW VRAM (12GB/16GB/20GB) suppo
 
 ## 1. One-Click Install
 
+You can automatically install and launch everything locally with Pinokio 1-click launcher: https://pinokio.computer/item?uri=https://github.com/cocktailpeanut/fluxgym
+
 
 ## 2. Install Manually
 
