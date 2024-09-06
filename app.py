@@ -152,6 +152,8 @@ def run_captioning(images, concept_sentence, *captions):
     model.to("cpu")
     del model
     del processor
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 def recursive_update(d, u):
     for k, v in u.items():
