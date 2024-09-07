@@ -48,7 +48,7 @@ If you're on Windows:
 
 ```
 python -m venv env
-env/Scripts/activate
+env\Scripts\activate
 ```
 
 If your're on Linux:
