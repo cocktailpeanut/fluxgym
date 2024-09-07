@@ -187,6 +187,8 @@ def gen_sh(
     vram,
 ):
 
+    print(f"gen_sh: network_dim:{network_dim}, max_train_epochs={max_train_epochs}, save_every_n_epochs={save_every_n_epochs}, timestep_sampling={timestep_sampling}, guidance_scale={guidance_scale}, vram={vram},")
+
     line_break = "\\"
     file_type = "sh"
     if sys.platform == "win32":
@@ -205,8 +207,7 @@ def gen_sh(
         optimizer = f"""--optimizer_type adafactor {line_break}
   --optimizer_args "relative_step=False" "scale_parameter=False" "warmup_init=False" {line_break}
   --lr_scheduler constant_with_warmup {line_break}
-  --max_grad_norm 0.0
-"""
+  --max_grad_norm 0.0 {line_break}"""
     elif vram == "12G":
       # 12G VRAM
         optimizer = f"""--optimizer_type adafactor {line_break}
@@ -214,11 +215,10 @@ def gen_sh(
   --split_mode {line_break}
   --network_args "train_blocks=single" {line_break}
   --lr_scheduler constant_with_warmup {line_break}
-  --max_grad_norm 0.0
-"""
+  --max_grad_norm 0.0 {line_break}"""
     else:
         # 20G+ VRAM
-        optimizer = ""
+        optimizer = f"--optimizer_type adamw8bit {line_break}"
 
     sh = f"""accelerate launch {line_break}
   --mixed_precision bf16 {line_break}
@@ -231,30 +231,29 @@ def gen_sh(
   --cache_latents_to_disk {line_break}
   --save_model_as safetensors {line_break}
   --sdpa --persistent_data_loader_workers {line_break}
-  --max_data_loader_n_workers {workers.value} {line_break}
+  --max_data_loader_n_workers {workers} {line_break}
   --seed {seed} {line_break}
   --gradient_checkpointing {line_break}
   --mixed_precision bf16 {line_break}
   --save_precision bf16 {line_break}
   --network_module networks.lora_flux {line_break}
-  --network_dim 4 {line_break}
-  --optimizer_type adamw8bit {line_break}
+  --network_dim {network_dim} {line_break}
+  {optimizer}
   --learning_rate {learning_rate} {line_break}
   --cache_text_encoder_outputs {line_break}
   --cache_text_encoder_outputs_to_disk {line_break}
   --fp8_base {line_break}
   --highvram {line_break}
-  --max_train_epochs {max_train_epochs.value} {line_break}
-  --save_every_n_epochs {save_every_n_epochs.value} {line_break}
+  --max_train_epochs {max_train_epochs} {line_break}
+  --save_every_n_epochs {save_every_n_epochs} {line_break}
   --dataset_config {resolve_path('dataset.toml')} {line_break}
   --output_dir {output_dir} {line_break}
   --output_name {output_name} {line_break}
-  --timestep_sampling {timestep_sampling.value} {line_break}
+  --timestep_sampling {timestep_sampling} {line_break}
   --discrete_flow_shift 3.1582 {line_break}
   --model_prediction_type raw {line_break}
-  --guidance_scale {guidance_scale.value} {line_break}
+  --guidance_scale {guidance_scale} {line_break}
   --loss_type l2 {line_break}
-  {optimizer}
 """
 
   # customize mixed_precision, save_precision
@@ -307,9 +306,14 @@ def start_training(
     lora_name,
     resolution,
     seed,
+    workers,
     class_tokens,
     learning_rate,
     network_dim,
+    max_train_epochs,
+    save_every_n_epochs,
+    timestep_sampling,
+    guidance_scale,
     dataset_folder,
     vram,
     num_repeats,
@@ -323,7 +327,8 @@ def start_training(
     gen_sh(
       output_name,
       resolution,
-      seed, workers,
+      seed,
+      workers,
       learning_rate,
       network_dim,
       max_train_epochs,
@@ -439,25 +444,25 @@ with gr.Blocks(elem_id="app", theme=theme, css=css) as demo:
                 placeholder="uncommon word like p3rs0n or trtcrd, or sentence like 'in the style of CNSTLL'",
                 interactive=True,
             )
-            vram = gr.Radio(["20G", "16G", "12G" ], value="20G", label="VRAM")
-            num_repeats = gr.Number(value=10, precision=0, label="Repeat trains per image")
-            max_train_epochs = gr.Number(label="Max Train Epochs", value=16)
+            vram = gr.Radio(["20G", "16G", "12G" ], value="20G", label="VRAM", interactive=True)
+            num_repeats = gr.Number(value=10, precision=0, label="Repeat trains per image", interactive=True)
+            max_train_epochs = gr.Number(label="Max Train Epochs", value=16, interactive=True)
             total_steps = gr.Number(0, interactive=False, label="Expected training steps")
             with gr.Accordion("Advanced options", open=False):
                 #resolution = gr.Number(label="Resolution", value=512, minimum=512, maximum=1024, step=512)
-                seed = gr.Number(label="Seed", value=42)
-                workers = gr.Number(label="Workers", value=2)
-                learning_rate = gr.Textbox(label="Learning Rate", value="1e-4")
+                seed = gr.Number(label="Seed", value=42, interactive=True)
+                workers = gr.Number(label="Workers", value=2, interactive=True)
+                learning_rate = gr.Textbox(label="Learning Rate", value="1e-4", interactive=True)
                 #learning_rate = gr.Number(label="Learning Rate", value=4e-4, minimum=1e-6, maximum=1e-3, step=1e-6)
 
-                save_every_n_epochs = gr.Number(label="Save every N epochs", value=4)
+                save_every_n_epochs = gr.Number(label="Save every N epochs", value=4, interactive=True)
 
-                guidance_scale = gr.Number(label="Guidance Scale", value=1.0)
+                guidance_scale = gr.Number(label="Guidance Scale", value=1.0, interactive=True)
 
-                timestep_sampling = gr.Textbox(label="Timestep Sampling", value="shift")
+                timestep_sampling = gr.Textbox(label="Timestep Sampling", value="shift", interactive=True)
 
     #            steps = gr.Number(label="Steps", value=1000, minimum=1, maximum=10000, step=1)
-                network_dim = gr.Number(label="LoRA Rank", value=4, minimum=4, maximum=128, step=4)
+                network_dim = gr.Number(label="LoRA Rank", value=4, minimum=4, maximum=128, step=4, interactive=True)
                 resolution = gr.Radio([512, 1024], value=512, label="Resize dataset images")
         with gr.Column():
             gr.Markdown(
@@ -567,9 +572,14 @@ with gr.Blocks(elem_id="app", theme=theme, css=css) as demo:
             lora_name,
             resolution,
             seed,
+            workers,
             concept_sentence,
             learning_rate,
             network_dim,
+            max_train_epochs,
+            save_every_n_epochs,
+            timestep_sampling,
+            guidance_scale,
             dataset_folder,
             vram,
             num_repeats,
