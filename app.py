@@ -452,7 +452,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css) as demo:
                 #resolution = gr.Number(label="Resolution", value=512, minimum=512, maximum=1024, step=512)
                 seed = gr.Number(label="Seed", value=42, interactive=True)
                 workers = gr.Number(label="Workers", value=2, interactive=True)
-                learning_rate = gr.Textbox(label="Learning Rate", value="1e-4", interactive=True)
+                learning_rate = gr.Textbox(label="Learning Rate", value="8e-4", interactive=True)
                 #learning_rate = gr.Number(label="Learning Rate", value=4e-4, minimum=1e-6, maximum=1e-3, step=1e-6)
 
                 save_every_n_epochs = gr.Number(label="Save every N epochs", value=4, interactive=True)
