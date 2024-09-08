@@ -79,10 +79,9 @@ def resize_image(image_path, output_path, size):
         img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
         img_resized.save(output_path)
 
-def create_dataset(size, *inputs):
+def create_dataset(destination_folder, size, *inputs):
     print("Creating dataset")
     images = inputs[0]
-    destination_folder = str(f"datasets/{uuid.uuid4()}")
     if not os.path.exists(destination_folder):
         os.makedirs(destination_folder)
 
@@ -253,15 +252,8 @@ def gen_sh(
   --discrete_flow_shift 3.1582 {line_break}
   --model_prediction_type raw {line_break}
   --guidance_scale {guidance_scale} {line_break}
-  --loss_type l2 {line_break}
-"""
-
-  # customize mixed_precision, save_precision
-
-    sh_filename = f"train.{file_type}"
-    with open(sh_filename, 'w', encoding="utf-8") as file:
-        file.write(sh)
-    gr.Info(f"Generated train script at {sh_filename}")
+  --loss_type l2 {line_break}"""
+    return sh
 
 def gen_toml(
   dataset_folder,
@@ -269,8 +261,7 @@ def gen_toml(
   class_tokens,
   num_repeats
 ):
-    toml = f"""
-[general]
+    toml = f"""[general]
 shuffle_caption = false
 caption_extension = '.txt'
 keep_tokens = 1
@@ -283,12 +274,8 @@ keep_tokens = 1
   [[datasets.subsets]]
   image_dir = '{resolve_path_without_quotes(dataset_folder)}'
   class_tokens = '{class_tokens}'
-  num_repeats = {num_repeats}
-"""
-    with open('dataset.toml', 'w', encoding="utf-8") as file:
-        file.write(toml)
-    gr.Info(f"Generated dataset.toml")
-
+  num_repeats = {num_repeats}"""
+    return toml
 
 def update_total_steps(max_train_epochs, num_repeats, images):
     try:
@@ -300,45 +287,27 @@ def update_total_steps(max_train_epochs, num_repeats, images):
         print("")
 
 
-def loaded():
-    print("launched")
 def start_training(
-    lora_name,
-    resolution,
-    seed,
-    workers,
-    class_tokens,
-    learning_rate,
-    network_dim,
-    max_train_epochs,
-    save_every_n_epochs,
-    timestep_sampling,
-    guidance_scale,
-    dataset_folder,
-    vram,
-    num_repeats,
+    train_script,
+    train_config,
 ):
     # write custom script and toml
     os.makedirs("models", exist_ok=True)
     os.makedirs("outputs", exist_ok=True)
 
-    # generate accelerate script
-    output_name = slugify(lora_name)
-    gen_sh(
-      output_name,
-      resolution,
-      seed,
-      workers,
-      learning_rate,
-      network_dim,
-      max_train_epochs,
-      save_every_n_epochs,
-      timestep_sampling,
-      guidance_scale,
-      vram,
-    )
-    # generate toml
-    gen_toml(dataset_folder, resolution, class_tokens, num_repeats)
+    file_type = "sh"
+    if sys.platform == "win32":
+        file_type = "bat"
+
+    sh_filename = f"train.{file_type}"
+    with open(sh_filename, 'w', encoding="utf-8") as file:
+        file.write(train_script)
+    gr.Info(f"Generated train script at {sh_filename}")
+
+    with open('dataset.toml', 'w', encoding="utf-8") as file:
+        file.write(train_config)
+    gr.Info(f"Generated dataset.toml")
+
 
     # Train
     if sys.platform == "win32":
@@ -355,6 +324,47 @@ def start_training(
     yield from runner.run_command([command], cwd=cwd)
     yield runner.log(f"Runner: {runner}")
     gr.Info(f"Training Complete. Check the outputs folder for the LoRA files.", duration=None)
+
+def update(
+    lora_name,
+    resolution,
+    seed,
+    workers,
+    class_tokens,
+    learning_rate,
+    network_dim,
+    max_train_epochs,
+    save_every_n_epochs,
+    timestep_sampling,
+    guidance_scale,
+    vram,
+    num_repeats,
+):
+    output_name = slugify(lora_name)
+    dataset_folder = str(f"datasets/{output_name}")
+    sh = gen_sh(
+        output_name,
+        resolution,
+        seed,
+        workers,
+        learning_rate,
+        network_dim,
+        max_train_epochs,
+        save_every_n_epochs,
+        timestep_sampling,
+        guidance_scale,
+        vram,
+    )
+    toml = gen_toml(
+        dataset_folder,
+        resolution,
+        class_tokens,
+        num_repeats
+    )
+    return gr.update(value=sh), gr.update(value=toml), dataset_folder
+
+def loaded():
+    print("launched")
 
 theme = gr.themes.Monochrome(
     text_size=gr.themes.Size(lg="18px", md="15px", sm="13px", xl="22px", xs="12px", xxl="24px", xxs="9px"),
@@ -418,7 +428,7 @@ function() {
 }
 """
 
-with gr.Blocks(elem_id="app", theme=theme, css=css) as demo:
+with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     output_components = []
     with gr.Row():
         gr.HTML("""<nav>
@@ -511,13 +521,32 @@ with gr.Blocks(elem_id="app", theme=theme, css=css) as demo:
 """, elem_classes="group_padding")
             start = gr.Button("Start training", visible=False)
             output_components.append(start)
-        #    terminal = LogsView()
-
-        #progress_area = gr.Markdown("")
+            train_script = gr.Textbox(label="Train script", max_lines=100, interactive=True)
+            train_config = gr.Textbox(label="Train config", max_lines=100, interactive=True)
     with gr.Row():
         terminal = LogsView(label="Train log", elem_id="terminal")
 
     dataset_folder = gr.State()
+
+    listeners = [
+        lora_name,
+        resolution,
+        seed,
+        workers,
+        concept_sentence,
+        learning_rate,
+        network_dim,
+        max_train_epochs,
+        save_every_n_epochs,
+        timestep_sampling,
+        guidance_scale,
+        vram,
+        num_repeats,
+    ]
+
+
+    for listener in listeners:
+        listener.change(update, inputs=listeners, outputs=[train_script, train_config, dataset_folder])
 
     images.upload(
         load_captioning,
@@ -566,30 +595,17 @@ with gr.Blocks(elem_id="app", theme=theme, css=css) as demo:
         outputs=[total_steps]
     )
 
-    start.click(fn=create_dataset, inputs=[resolution, images] + caption_list, outputs=dataset_folder).then(
+    start.click(fn=create_dataset, inputs=[dataset_folder, resolution, images] + caption_list, outputs=dataset_folder).then(
         fn=start_training,
         inputs=[
-            lora_name,
-            resolution,
-            seed,
-            workers,
-            concept_sentence,
-            learning_rate,
-            network_dim,
-            max_train_epochs,
-            save_every_n_epochs,
-            timestep_sampling,
-            guidance_scale,
-            dataset_folder,
-            vram,
-            num_repeats,
+            train_script,
+            train_config
         ],
         outputs=terminal,
     )
 
     do_captioning.click(fn=run_captioning, inputs=[images, concept_sentence] + caption_list, outputs=caption_list)
     demo.load(fn=loaded, js=js)
-
 
 if __name__ == "__main__":
     cwd = os.path.dirname(os.path.abspath(__file__))
