@@ -98,7 +98,7 @@ def create_dataset(destination_folder, size, *inputs):
 
         image_file_name = os.path.basename(new_image_path)
         caption_file_name = os.path.splitext(image_file_name)[0] + ".txt"
-        caption_path = os.path.normpath(os.path.join(destination_folder, caption_file_name))
+        caption_path = resolve_path_without_quotes(os.path.join(destination_folder, caption_file_name))
         print(f"image_path={new_image_path}, caption_path = {caption_path}, original_caption={original_caption}")
         with open(caption_path, 'w') as file:
             file.write(original_caption)
