@@ -15,6 +15,9 @@ Dead simple web UI for training FLUX LoRA **with LOW VRAM (12GB/16GB/20GB) suppo
 4. What if you could have the simplicity of AI-Toolkit WebUI and the flexibility of Kohya Scripts?
 5. Flux Gym was born. Supports 12GB, 16GB, 20GB VRAMs, and extensible since it uses Kohya Scripts underneath.
 
+# More Info
+
+To learn more, check out this X thread: https://x.com/cocktailpeanut/status/1832084951115972653
 
 # Install
 
