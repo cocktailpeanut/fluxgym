@@ -7,9 +7,15 @@ Dead simple web UI for training FLUX LoRA **with LOW VRAM (12GB/16GB/20GB) suppo
 
 ![screenshot.png](screenshot.png)
 
+---
+
 # How people are using Fluxgym
 
+Here are people using Fluxgym to locally train Lora sharing their experience:
+
 https://pinokio.computer/item?uri=https://github.com/cocktailpeanut/fluxgym
+
+---
 
 # What is this?
 
