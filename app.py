@@ -93,10 +93,11 @@ def create_dataset(destination_folder, size, *inputs):
         ext = os.path.splitext(new_image_path)[-1].lower()
         if ext != '.txt':
             resize_image(new_image_path, new_image_path, size)
-
+        if ext == '.txt':
+            shutil.copy(image, destination_folder)
+            continue
 
         # copy the captions
-
         original_caption = inputs[index + 1]
 
         image_file_name = os.path.basename(new_image_path)
