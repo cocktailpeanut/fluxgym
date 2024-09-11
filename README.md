@@ -9,31 +9,7 @@ Dead simple web UI for training FLUX LoRA **with LOW VRAM (12GB/16GB/20GB) suppo
 
 # How people are using Fluxgym
 
-- https://x.com/cocktailpeanut/status/1833881392482066638
-- https://x.com/Alone1Moon/status/1833348850662445369
-- https://x.com/_f_ai_9/status/1833485349995397167
-- https://x.com/intocryptoast/status/1833061082862412186
-- https://x.com/cocktailpeanut/status/1833888423716827321
-- https://x.com/cocktailpeanut/status/1833884852992516596
-- https://x.com/cocktailpeanut/status/1833885335077417046
-- https://x.com/NiwonArt/status/1833565746624139650
-- https://x.com/cocktailpeanut/status/1833884361986380117
-- https://x.com/NiwonArt/status/1833599399764889685
-- https://x.com/LikeToasters/status/1832934391217045913
-- https://x.com/cocktailpeanut/status/1832924887456817415
-- https://x.com/cocktailpeanut/status/1832927154536902897
-- https://x.com/YabaiHamster/status/1832697724690386992
-- https://x.com/cocktailpeanut/status/1832747889497366706
-- https://x.com/PhotogenicWeekE/status/1832720544959185202
-- https://x.com/zuzaritt/status/1832748542164652390
-- https://x.com/foxyy4i/status/1832764883710185880
-- https://x.com/waynedahlberg/status/1832226132999213095
-- https://x.com/PhotoGarrido/status/1832214644515041770
-- https://x.com/cocktailpeanut/status/1832787205774786710
-- https://x.com/cocktailpeanut/status/1832151307198541961
-- https://x.com/cocktailpeanut/status/1832145996014612735
-- https://x.com/cocktailpeanut/status/1832084951115972653
-- https://x.com/cocktailpeanut/status/1832091112086843684
+https://pinokio.computer/item?uri=https://github.com/cocktailpeanut/fluxgym
 
 # What is this?
 
