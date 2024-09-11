@@ -184,15 +184,22 @@ def gen_sh(
     timestep_sampling,
     guidance_scale,
     vram,
+    sample_prompts,
+    sample_every_n_steps,
 ):
 
-    print(f"gen_sh: network_dim:{network_dim}, max_train_epochs={max_train_epochs}, save_every_n_epochs={save_every_n_epochs}, timestep_sampling={timestep_sampling}, guidance_scale={guidance_scale}, vram={vram},")
+    print(f"gen_sh: network_dim:{network_dim}, max_train_epochs={max_train_epochs}, save_every_n_epochs={save_every_n_epochs}, timestep_sampling={timestep_sampling}, guidance_scale={guidance_scale}, vram={vram}, sample_prompts={sample_prompts}, sample_every_n_steps={sample_every_n_steps}")
+
 
     line_break = "\\"
     file_type = "sh"
     if sys.platform == "win32":
         line_break = "^"
         file_type = "bat"
+
+    sample = ""
+    if len(sample_prompts) > 0 and sample_every_n_steps > 0:
+        sample = f"""--sample_prompts={resolve_path('sample_prompts.txt')} --sample_every_n_steps="{sample_every_n_steps}" {line_break}"""
 
     pretrained_model_path = resolve_path("models/unet/flux1-dev.sft")
     clip_path = resolve_path("models/clip/clip_l.safetensors")
@@ -237,7 +244,7 @@ def gen_sh(
   --save_precision bf16 {line_break}
   --network_module networks.lora_flux {line_break}
   --network_dim {network_dim} {line_break}
-  {optimizer}
+  {optimizer}{sample}
   --learning_rate {learning_rate} {line_break}
   --cache_text_encoder_outputs {line_break}
   --cache_text_encoder_outputs_to_disk {line_break}
@@ -286,10 +293,20 @@ def update_total_steps(max_train_epochs, num_repeats, images):
     except:
         print("")
 
+def get_samples():
+    try:
+        samples_path = resolve_path_without_quotes('outputs/sample')
+        files = [os.path.join(samples_path, file) for file in os.listdir(samples_path)]
+        files.sort(key=lambda file: os.path.getctime(file), reverse=True)
+        print(f"files={files}")
+        return files
+    except:
+        return []
 
 def start_training(
     train_script,
     train_config,
+    sample_prompts,
 ):
     # write custom script and toml
     os.makedirs("models", exist_ok=True)
@@ -308,6 +325,9 @@ def start_training(
         file.write(train_config)
     gr.Info(f"Generated dataset.toml")
 
+    with open('sample_prompts.txt', 'w', encoding='utf-8') as file:
+        file.write(sample_prompts)
+    gr.Info(f"Generated sample_prompts.txt")
 
     # Train
     if sys.platform == "win32":
@@ -339,6 +359,8 @@ def update(
     guidance_scale,
     vram,
     num_repeats,
+    sample_prompts,
+    sample_every_n_steps,
 ):
     output_name = slugify(lora_name)
     dataset_folder = str(f"datasets/{output_name}")
@@ -354,6 +376,8 @@ def update(
         timestep_sampling,
         guidance_scale,
         vram,
+        sample_prompts,
+        sample_every_n_steps,
     )
     toml = gen_toml(
         dataset_folder,
@@ -365,6 +389,9 @@ def update(
 
 def loaded():
     print("launched")
+
+def update_sample(concept_sentence):
+    return gr.update(value=concept_sentence)
 
 theme = gr.themes.Monochrome(
     text_size=gr.themes.Size(lg="18px", md="15px", sm="13px", xl="22px", xs="12px", xxl="24px", xxs="9px"),
@@ -458,6 +485,8 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
             num_repeats = gr.Number(value=10, precision=0, label="Repeat trains per image", interactive=True)
             max_train_epochs = gr.Number(label="Max Train Epochs", value=16, interactive=True)
             total_steps = gr.Number(0, interactive=False, label="Expected training steps")
+            sample_prompts = gr.Textbox("", lines=5, label="Sample Image Prompts (Separate with new lines)", interactive=True)
+            sample_every_n_steps = gr.Number(0, precision=0, label="Sample Image Every N Steps", interactive=True)
             with gr.Accordion("Advanced options", open=False):
                 #resolution = gr.Number(label="Resolution", value=512, minimum=512, maximum=1024, step=512)
                 seed = gr.Number(label="Seed", value=42, interactive=True)
@@ -473,20 +502,21 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
 
     #            steps = gr.Number(label="Steps", value=1000, minimum=1, maximum=10000, step=1)
                 network_dim = gr.Number(label="LoRA Rank", value=4, minimum=4, maximum=128, step=4, interactive=True)
-                resolution = gr.Radio([512, 1024], value=512, label="Resize dataset images")
+                resolution = gr.Number(value=512, precision=0, label="Resize dataset images")
         with gr.Column():
             gr.Markdown(
                 """# Step 2. Dataset
 <p style="margin-top:0">Make sure the captions include the trigger word.</p>
 """, elem_classes="group_padding")
-            images = gr.File(
-                file_types=["image", ".txt"],
-                label="Upload your images",
-                file_count="multiple",
-                interactive=True,
-                visible=True,
-                scale=1,
-            )
+            with gr.Group():
+                images = gr.File(
+                    file_types=["image", ".txt"],
+                    label="Upload your images",
+                    file_count="multiple",
+                    interactive=True,
+                    visible=True,
+                    scale=1,
+                )
             with gr.Group(visible=False) as captioning_area:
                 do_captioning = gr.Button("Add AI captions with Florence-2")
                 output_components.append(captioning_area)
@@ -525,6 +555,9 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
             train_config = gr.Textbox(label="Train config", max_lines=100, interactive=True)
     with gr.Row():
         terminal = LogsView(label="Train log", elem_id="terminal")
+    with gr.Row():
+        gallery = gr.Gallery(get_samples, label="Samples", every=10, columns=6)
+
 
     dataset_folder = gr.State()
 
@@ -542,6 +575,8 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
         guidance_scale,
         vram,
         num_repeats,
+        sample_prompts,
+        sample_every_n_steps,
     ]
 
 
@@ -595,11 +630,15 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
         outputs=[total_steps]
     )
 
+
+    concept_sentence.change(fn=update_sample, inputs=[concept_sentence], outputs=sample_prompts)
+
     start.click(fn=create_dataset, inputs=[dataset_folder, resolution, images] + caption_list, outputs=dataset_folder).then(
         fn=start_training,
         inputs=[
             train_script,
-            train_config
+            train_config,
+            sample_prompts,
         ],
         outputs=terminal,
     )
