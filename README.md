@@ -149,3 +149,20 @@ The usage is pretty straightforward:
 That's all!
 
 ![flow.gif](flow.gif)
+
+# Configuration
+
+## Sample Images
+
+By default fluxgym doesn't generate any sample images during training.
+
+You can however configure Fluxgym to automatically generate sample images for every N steps. Here's what it looks like:
+
+![sample.png](sample.png)
+
+To turn this on, just set the two fields:
+
+1. **Sample Image Prompts:** These prompts will be used to automatically generate images during training. If you want multiple, separate teach prompt with new line.
+2. **Sample Image Every N Steps:** If your "Expected training steps" is 960 and your "Sample Image Every N Steps" is 100, the images will be generated at step 100, 200, 300, 400, 500, 600, 700, 800, 900, for EACH prompt.
+
+![sample_fields.png](sample_fields.png)
