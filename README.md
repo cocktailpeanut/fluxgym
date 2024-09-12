@@ -176,3 +176,41 @@ To turn this on, just set the two fields:
 2. **Sample Image Every N Steps:** If your "Expected training steps" is 960 and your "Sample Image Every N Steps" is 100, the images will be generated at step 100, 200, 300, 400, 500, 600, 700, 800, 900, for EACH prompt.
 
 ![sample_fields.png](sample_fields.png)
+
+## Advanced Sample Images
+
+Thanks to the built-in syntax from [kohya/sd-scripts](https://github.com/kohya-ss/sd-scripts?tab=readme-ov-file#sample-image-generation-during-training), you can control exactly how the sample images are generated during the training phase:
+
+Let's say the trigger word is **hrld person.** Normally you would try sample prompts like:
+
+```
+hrld person is riding a bike
+hrld person is a body builder
+hrld person is a rock star
+```
+
+But for every prompt you can include **advanced flags** to fully control the image generation process. For example, the `--d` flag lets you specify the SEED.
+
+Specifying a seed means every sample image will use that exact seed, which means you can literally see the LoRA evolve. Here's an example usage:
+
+```
+hrld person is riding a bike --d 42
+hrld person is a body builder --d 42
+hrld person is a rock star --d 42
+```
+
+Here's what it looks like in the UI:
+
+![flags.png](flags.png)
+
+In addition to the `--d` flag, here are other flags you can use:
+
+
+- `--n`: Negative prompt up to the next option.
+- `--w`: Specifies the width of the generated image.
+- `--h`: Specifies the height of the generated image.
+- `--d`: Specifies the seed of the generated image.
+- `--l`: Specifies the CFG scale of the generated image.
+- `--s`: Specifies the number of steps in the generation.
+
+The prompt weighting such as `( )` and `[ ]` also work. (Learn more about [Attention/Emphasis](https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Features#attentionemphasis))
