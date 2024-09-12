@@ -203,6 +203,10 @@ Here's what it looks like in the UI:
 
 ![flags.png](flags.png)
 
+And here are the results:
+
+![seed.gif](seed.gif)
+
 In addition to the `--d` flag, here are other flags you can use:
 
 
