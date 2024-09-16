@@ -112,7 +112,7 @@ Second, download the following model under the `models/vae` folder:
 
 - https://huggingface.co/cocktailpeanut/xulf-dev/resolve/main/ae.sft?download=true
 
-Finally, donwload the following model under the `models/unet` folder:
+Finally, download the following model under the `models/unet` folder:
 
 - https://huggingface.co/cocktailpeanut/xulf-dev/resolve/main/flux1-dev.sft?download=true
 
