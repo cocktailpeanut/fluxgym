@@ -160,7 +160,7 @@ def upload_hf(lora_rows, repo_owner, repo_name, repo_visibility, hf_token):
         huggingface_repo_visibility=repo_visibility,
         huggingface_path_in_repo="",
         huggingface_token=hf_token,
-#        async_upload=True
+        async_upload=False
     )
     print(f"upload_hf args={args}")
     huggingface_util.upload(args=args, src=src)
