@@ -611,7 +611,7 @@ def update_sample(concept_sentence):
 
 def refresh_publish_tab():
     loras = get_loras()
-    return gr.Dropdown(choices=loras)
+    return gr.Dropdown(label="Trained LoRAs", choices=loras)
 
 def init_advanced():
     # if basic_args
@@ -916,7 +916,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                     with gr.Row():
                         repo_owner = gr.Textbox(label="Account", interactive=False)
                         repo_name = gr.Textbox(label="Repository Name")
-                    repo_visibility = gr.Textbox(label="Repository Visibility", value="public")
+                    repo_visibility = gr.Textbox(label="Repository Visibility ('public' or 'private')", value="public")
                     upload_button = gr.Button("Upload to HuggingFace")
                     upload_button.click(
                         fn=upload_hf,
