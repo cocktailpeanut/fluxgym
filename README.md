@@ -218,3 +218,11 @@ In addition to the `--d` flag, here are other flags you can use:
 - `--s`: Specifies the number of steps in the generation.
 
 The prompt weighting such as `( )` and `[ ]` also work. (Learn more about [Attention/Emphasis](https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Features#attentionemphasis))
+
+## Publishing to Huggingface
+
+1. Get your Huggingface Token from https://huggingface.co/settings/tokens
+2. Enter the token in the "Huggingface Token" field and click "Login". This will save the token text in a local file named `HF_TOKEN` (All local and private).
+3. Once you're logged in, you will be able to select a trained LoRA from the dropdown, edit the name if you want, and publish to Huggingface.
+
+![publish_to_hf.png](publish_to_hf.png)
