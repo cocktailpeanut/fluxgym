@@ -1,11 +1,6 @@
 import os
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 import sys
 import subprocess
-
-# Add the current working directory to the Python path
-sys.path.insert(0, os.getcwd())
-
 import gradio as gr
 from PIL import Image
 import torch
@@ -16,9 +11,160 @@ import yaml
 from slugify import slugify
 from transformers import AutoProcessor, AutoModelForCausalLM
 from gradio_logsview import LogsView, LogsViewRunner
-from huggingface_hub import hf_hub_download
-
+from huggingface_hub import hf_hub_download, HfApi
+from library import flux_train_utils, huggingface_util
+from argparse import Namespace
+import train_network
+import toml
+import re
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+os.environ['GRADIO_ANALYTICS_ENABLED'] = '0'
+sys.path.insert(0, os.getcwd())
+sys.path.append(os.path.join(os.path.dirname(__file__), 'sd-scripts'))
 MAX_IMAGES = 150
+def readme(lora_name, instance_prompt, sample_prompts):
+    base_model = "black-forest-labs/FLUX.1-dev"
+    license = "other"
+    license_name = "flux-1-dev-non-commercial-license"
+    license_link = "https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/LICENSE.md"
+    tags = [ "text-to-image", "flux", "lora", "diffusers", "template:sd-lora", "fluxgym" ]
+
+    # widgets
+    widgets = []
+    sample_image_paths = []
+    output_name = slugify(lora_name)
+    samples_dir = resolve_path_without_quotes(f"outputs/{output_name}/sample")
+    for filename in os.listdir(samples_dir):
+        # Filename Schema: [name]_[steps]_[index]_[timestamp].png
+        match = re.search(r"_(\d+)_(\d+)_(\d+)\.png$", filename)
+        if match:
+            steps, index, timestamp = int(match.group(1)), int(match.group(2)), int(match.group(3))
+            sample_image_paths.append((steps, index, f"sample/{filename}"))
+
+    # Sort by numeric index
+    sample_image_paths.sort(key=lambda x: x[0], reverse=True)
+
+    final_sample_image_paths = sample_image_paths[:len(sample_prompts)]
+    final_sample_image_paths.sort(key=lambda x: x[1])
+    for i, prompt in enumerate(sample_prompts):
+        _, _, image_path = final_sample_image_paths[i]
+        widgets.append(
+            {
+                "text": prompt,
+                "output": {
+                    "url": image_path
+                },
+            }
+        )
+    dtype = "torch.bfloat16"
+    # Construct the README content
+    readme_content = f"""---
+tags:
+{yaml.dump(tags, indent=4).strip()}
+{"widget:" if os.path.isdir(samples_dir) else ""}
+{yaml.dump(widgets, indent=4).strip() if widgets else ""}
+base_model: {base_model}
+{"instance_prompt: " + instance_prompt if instance_prompt else ""}
+license: {license}
+{'license_name: ' + license_name if license == "other" else ""}
+{'license_link: ' + license_link if license == "other" else ""}
+---
+
+# {lora_name}
+
+A Flux LoRA trained on a local computer with [Fluxgym](https://github.com/cocktailpeanut/fluxgym)
+
+<Gallery />
+
+## Trigger words
+
+{"You should use `" + instance_prompt + "` to trigger the image generation." if instance_prompt else "No trigger words defined."}
+
+## Download model and use it with ComfyUI, AUTOMATIC1111, SD.Next, Invoke AI, Forge, etc.
+
+Weights for this model are available in Safetensors format.
+
+"""
+    return readme_content
+
+def account_hf():
+    try:
+        with open("HF_TOKEN", "r") as file:
+            token = file.read()
+            api = HfApi(token=token)
+            try:
+                account = api.whoami()
+                return { "token": token, "account": account['name'] }
+            except:
+                return None
+    except:
+        return None
+
+"""
+hf_logout.click(fn=logout_hf, outputs=[hf_token, hf_login, hf_logout, repo_owner])
+"""
+def logout_hf():
+    os.remove("HF_TOKEN")
+    global current_account
+    current_account = account_hf()
+    print(f"current_account={current_account}")
+    return gr.update(value=""), gr.update(visible=True), gr.update(visible=False), gr.update(value="", visible=False)
+
+
+"""
+hf_login.click(fn=login_hf, inputs=[hf_token], outputs=[hf_token, hf_login, hf_logout, repo_owner])
+"""
+def login_hf(hf_token):
+    api = HfApi(token=hf_token)
+    try:
+        account = api.whoami()
+        if account != None:
+            if "name" in account:
+                with open("HF_TOKEN", "w") as file:
+                    file.write(hf_token)
+                global current_account
+                current_account = account_hf()
+                return gr.update(visible=True), gr.update(visible=False), gr.update(visible=True), gr.update(value=current_account["account"], visible=True)
+        return gr.update(), gr.update(), gr.update(), gr.update()
+    except:
+        print(f"incorrect hf_token")
+        return gr.update(), gr.update(), gr.update(), gr.update()
+
+def upload_hf(lora_rows, repo_owner, repo_name, repo_visibility, hf_token):
+    src = lora_rows
+    repo_id = f"{repo_owner}/{repo_name}"
+    gr.Info(f"Uploading to Huggingface. Please Stand by...", duration=None)
+    print(f"repo_id={repo_id} repo_visibility={repo_visibility} src={src}")
+    lora_name = os.path.basename(src)
+    dataset_toml_path = os.path.normpath(os.path.join(src, "dataset.toml"))
+    print(f"lora_name={lora_name}, dataset_toml_path={dataset_toml_path}")
+    with open(dataset_toml_path, 'r') as f:
+        config = toml.load(f)
+    concept_sentence = config['datasets'][0]['subsets'][0]['class_tokens']
+    print(f"concept_sentence={concept_sentence}")
+    # Generate README
+    output_name = slugify(lora_name)
+    print(f"lora_name {lora_name}, concept_sentence={concept_sentence}, output_name={output_name}")
+    sample_prompts_path = resolve_path_without_quotes(f"outputs/{output_name}/sample_prompts.txt")
+    with open(sample_prompts_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    sample_prompts = [line.strip() for line in lines if len(line.strip()) > 0 and line[0] != "#"]
+    md = readme(lora_name, concept_sentence, sample_prompts)
+    # Write README
+    readme_path = resolve_path_without_quotes(f"outputs/{output_name}/README.md")
+    with open(readme_path, "w", encoding="utf-8") as f:
+        f.write(md)
+    args = Namespace(
+        huggingface_repo_id=repo_id,
+        huggingface_repo_type="model",
+        huggingface_repo_visibility=repo_visibility,
+        huggingface_path_in_repo="",
+        huggingface_token=hf_token,
+        async_upload=False
+    )
+    print(f"upload_hf args={args}")
+    huggingface_util.upload(args=args, src=src)
+    gr.Info(f"[Upload Complete] https://huggingface.co/{repo_id}", duration=None)
 
 def load_captioning(uploaded_files, concept_sentence):
     uploaded_images = [file for file in uploaded_files if not file.endswith('.txt')]
@@ -88,15 +234,17 @@ def create_dataset(destination_folder, size, *inputs):
     for index, image in enumerate(images):
         # copy the images to the datasets folder
         new_image_path = shutil.copy(image, destination_folder)
-        
+
         # if it's a caption text file skip the next bit
-        ext = os.path.splitext(new_image_path)[-1].lower()   
+        ext = os.path.splitext(new_image_path)[-1].lower()
         if ext == '.txt':
             continue
-            
+
+        # resize the images
         resize_image(new_image_path, new_image_path, size)
-        
+
         # copy the captions
+
         original_caption = inputs[index + 1]
 
         image_file_name = os.path.basename(new_image_path)
@@ -189,10 +337,13 @@ def gen_sh(
     vram,
     sample_prompts,
     sample_every_n_steps,
+    *advanced_components
 ):
 
     print(f"gen_sh: network_dim:{network_dim}, max_train_epochs={max_train_epochs}, save_every_n_epochs={save_every_n_epochs}, timestep_sampling={timestep_sampling}, guidance_scale={guidance_scale}, vram={vram}, sample_prompts={sample_prompts}, sample_every_n_steps={sample_every_n_steps}")
 
+    output_dir = resolve_path(f"outputs/{output_name}")
+    sample_prompts_path = resolve_path(f"outputs/{output_name}/sample_prompts.txt")
 
     line_break = "\\"
     file_type = "sh"
@@ -200,15 +351,11 @@ def gen_sh(
         line_break = "^"
         file_type = "bat"
 
+    ############# Sample args ########################
     sample = ""
     if len(sample_prompts) > 0 and sample_every_n_steps > 0:
-        sample = f"""--sample_prompts={resolve_path('sample_prompts.txt')} --sample_every_n_steps="{sample_every_n_steps}" {line_break}"""
+        sample = f"""--sample_prompts={sample_prompts_path} --sample_every_n_steps="{sample_every_n_steps}" {line_break}"""
 
-    pretrained_model_path = resolve_path("models/unet/flux1-dev.sft")
-    clip_path = resolve_path("models/clip/clip_l.safetensors")
-    t5_path = resolve_path("models/clip/t5xxl_fp16.safetensors")
-    ae_path = resolve_path("models/vae/ae.sft")
-    output_dir = resolve_path("outputs")
 
     ############# Optimizer args ########################
     if vram == "16G":
@@ -229,6 +376,12 @@ def gen_sh(
         # 20G+ VRAM
         optimizer = f"--optimizer_type adamw8bit {line_break}"
 
+
+    #######################################################
+    pretrained_model_path = resolve_path("models/unet/flux1-dev.sft")
+    clip_path = resolve_path("models/clip/clip_l.safetensors")
+    t5_path = resolve_path("models/clip/t5xxl_fp16.safetensors")
+    ae_path = resolve_path("models/vae/ae.sft")
     sh = f"""accelerate launch {line_break}
   --mixed_precision bf16 {line_break}
   --num_cpu_threads_per_process 1 {line_break}
@@ -255,7 +408,7 @@ def gen_sh(
   --highvram {line_break}
   --max_train_epochs {max_train_epochs} {line_break}
   --save_every_n_epochs {save_every_n_epochs} {line_break}
-  --dataset_config {resolve_path('dataset.toml')} {line_break}
+  --dataset_config {resolve_path(f"outputs/{output_name}/dataset.toml")} {line_break}
   --output_dir {output_dir} {line_break}
   --output_name {output_name} {line_break}
   --timestep_sampling {timestep_sampling} {line_break}
@@ -263,6 +416,31 @@ def gen_sh(
   --model_prediction_type raw {line_break}
   --guidance_scale {guidance_scale} {line_break}
   --loss_type l2 {line_break}"""
+   
+
+
+    ############# Advanced args ########################
+    global advanced_component_ids
+    global original_advanced_component_values
+   
+    # check dirty
+    print(f"original_advanced_component_values = {original_advanced_component_values}")
+    advanced_flags = []
+    for i, current_value in enumerate(advanced_components):
+#        print(f"compare {advanced_component_ids[i]}: old={original_advanced_component_values[i]}, new={current_value}")
+        if original_advanced_component_values[i] != current_value:
+            # dirty
+            if current_value == True:
+                # Boolean
+                advanced_flags.append(advanced_component_ids[i])
+            else:
+                # string
+                advanced_flags.append(f"{advanced_component_ids[i]} {current_value}")
+
+    if len(advanced_flags) > 0:
+        advanced_flags_str = f" {line_break}\n  ".join(advanced_flags)
+        sh = sh + "\n  " + advanced_flags_str
+
     return sh
 
 def gen_toml(
@@ -296,17 +474,32 @@ def update_total_steps(max_train_epochs, num_repeats, images):
     except:
         print("")
 
-def get_samples():
+def set_repo(lora_rows):
+    selected_name = os.path.basename(lora_rows)
+    return gr.update(value=selected_name)
+
+def get_loras():
     try:
-        samples_path = resolve_path_without_quotes('outputs/sample')
+        outputs_path = resolve_path_without_quotes(f"outputs")
+        files = os.listdir(outputs_path)
+        folders = [os.path.join(outputs_path, item) for item in files if os.path.isdir(os.path.join(outputs_path, item)) and item != "sample"]
+        folders.sort(key=lambda file: os.path.getctime(file), reverse=True)
+        return folders
+    except Exception as e:
+        return []
+
+def get_samples(lora_name):
+    output_name = slugify(lora_name)
+    try:
+        samples_path = resolve_path_without_quotes(f"outputs/{output_name}/sample")
         files = [os.path.join(samples_path, file) for file in os.listdir(samples_path)]
         files.sort(key=lambda file: os.path.getctime(file), reverse=True)
-        print(f"files={files}")
         return files
     except:
         return []
 
 def start_training(
+    lora_name,
     train_script,
     train_config,
     sample_prompts,
@@ -314,29 +507,37 @@ def start_training(
     # write custom script and toml
     os.makedirs("models", exist_ok=True)
     os.makedirs("outputs", exist_ok=True)
+    output_name = slugify(lora_name)
+    output_dir = resolve_path_without_quotes(f"outputs/{output_name}")
+    os.makedirs(output_dir, exist_ok=True)
+
 
     file_type = "sh"
     if sys.platform == "win32":
         file_type = "bat"
 
     sh_filename = f"train.{file_type}"
-    with open(sh_filename, 'w', encoding="utf-8") as file:
+    sh_filepath = resolve_path_without_quotes(f"outputs/{output_name}/{sh_filename}")
+    with open(sh_filepath, 'w', encoding="utf-8") as file:
         file.write(train_script)
     gr.Info(f"Generated train script at {sh_filename}")
 
-    with open('dataset.toml', 'w', encoding="utf-8") as file:
+
+    dataset_path = resolve_path_without_quotes(f"outputs/{output_name}/dataset.toml")
+    with open(dataset_path, 'w', encoding="utf-8") as file:
         file.write(train_config)
     gr.Info(f"Generated dataset.toml")
 
-    with open('sample_prompts.txt', 'w', encoding='utf-8') as file:
+    sample_prompts_path = resolve_path_without_quotes(f"outputs/{output_name}/sample_prompts.txt")
+    with open(sample_prompts_path, 'w', encoding='utf-8') as file:
         file.write(sample_prompts)
     gr.Info(f"Generated sample_prompts.txt")
 
     # Train
     if sys.platform == "win32":
-        command = resolve_path_without_quotes('train.bat')
+        command = sh_filepath
     else:
-        command = f"bash {resolve_path('train.sh')}"
+        command = f"bash \"{sh_filepath}\""
 
     # Use Popen to run the command and capture output in real-time
     env = os.environ.copy()
@@ -347,6 +548,7 @@ def start_training(
     yield from runner.run_command([command], cwd=cwd)
     yield runner.log(f"Runner: {runner}")
     gr.Info(f"Training Complete. Check the outputs folder for the LoRA files.", duration=None)
+
 
 def update(
     lora_name,
@@ -364,6 +566,7 @@ def update(
     num_repeats,
     sample_prompts,
     sample_every_n_steps,
+    *advanced_components,
 ):
     output_name = slugify(lora_name)
     dataset_folder = str(f"datasets/{output_name}")
@@ -381,6 +584,7 @@ def update(
         vram,
         sample_prompts,
         sample_every_n_steps,
+        *advanced_components,
     )
     toml = gen_toml(
         dataset_folder,
@@ -390,11 +594,122 @@ def update(
     )
     return gr.update(value=sh), gr.update(value=toml), dataset_folder
 
+"""
+demo.load(fn=loaded, js=js, outputs=[hf_token, hf_login, hf_logout, hf_account])
+"""
 def loaded():
-    print("launched")
+    global current_account
+    current_account = account_hf()
+    print(f"current_account={current_account}")
+    if current_account != None:
+        return gr.update(value=current_account["token"]), gr.update(visible=False), gr.update(visible=True), gr.update(value=current_account["account"], visible=True)
+    else:
+        return gr.update(value=""), gr.update(visible=True), gr.update(visible=False), gr.update(value="", visible=False)
 
 def update_sample(concept_sentence):
     return gr.update(value=concept_sentence)
+
+def refresh_publish_tab():
+    loras = get_loras()
+    return gr.Dropdown(label="Trained LoRAs", choices=loras)
+
+def init_advanced():
+    # if basic_args
+    basic_args = {
+        'pretrained_model_name_or_path',
+        'clip_l',
+        't5xxl',
+        'ae',
+        'cache_latents_to_disk',
+        'save_model_as',
+        'sdpa',
+        'persistent_data_loader_workers',
+        'max_data_loader_n_workers',
+        'seed',
+        'gradient_checkpointing',
+        'mixed_precision',
+        'save_precision',
+        'network_module',
+        'network_dim',
+        'learning_rate',
+        'cache_text_encoder_outputs',
+        'cache_text_encoder_outputs_to_disk',
+        'fp8_base',
+        'highvram',
+        'max_train_epochs',
+        'save_every_n_epochs',
+        'dataset_config',
+        'output_dir',
+        'output_name',
+        'timestep_sampling',
+        'discrete_flow_shift',
+        'model_prediction_type',
+        'guidance_scale',
+        'loss_type',
+        'optimizer_type',
+        'optimizer_args',
+        'lr_scheduler',
+        'sample_prompts',
+        'sample_every_n_steps',
+        'max_grad_norm',
+        'split_mode',
+        'network_args'
+    }
+
+    # generate a UI config
+    # if not in basic_args, create a simple form
+    parser = train_network.setup_parser()
+    flux_train_utils.add_flux_train_arguments(parser)
+    args_info = {}
+    for action in parser._actions:
+        if action.dest != 'help':  # Skip the default help argument
+            # if the dest is included in basic_args
+            args_info[action.dest] = {
+                "action": action.option_strings,  # Option strings like '--use_8bit_adam'
+                "type": action.type,              # Type of the argument
+                "help": action.help,              # Help message
+                "default": action.default,        # Default value, if any
+                "required": action.required       # Whether the argument is required
+            }
+    temp = []
+    for key in args_info:
+        temp.append({ 'key': key, 'action': args_info[key] })
+    temp.sort(key=lambda x: x['key'])
+    advanced_component_ids = []
+    advanced_components = []
+    for item in temp:
+        key = item['key']
+        action = item['action']
+        if key in basic_args:
+            print("")
+        else:
+            action_type = str(action['type'])
+            component = None
+            with gr.Column(min_width=300):
+                if action_type == "None":
+                    # radio
+                    component = gr.Checkbox()
+    #            elif action_type == "<class 'str'>":
+    #                component = gr.Textbox()
+    #            elif action_type == "<class 'int'>":
+    #                component = gr.Number(precision=0)
+    #            elif action_type == "<class 'float'>":
+    #                component = gr.Number()
+    #            elif "int_or_float" in action_type:
+    #                component = gr.Number()
+                else:
+                    component = gr.Textbox(value="")
+                if component != None:
+                    component.interactive = True
+                    component.elem_id = action['action'][0]
+                    component.label = component.elem_id
+                    component.elem_classes = ["advanced"]
+                if action['help'] != None:
+                    component.info = action['help']
+            advanced_components.append(component)
+            advanced_component_ids.append(component.elem_id)
+    return advanced_components, advanced_component_ids
+
 
 theme = gr.themes.Monochrome(
     text_size=gr.themes.Size(lg="18px", md="15px", sm="13px", xl="22px", xs="12px", xxl="24px", xxs="9px"),
@@ -409,6 +724,7 @@ css = """
         transform: rotate(360deg);
     }
 }
+#advanced_options .advanced:nth-child(even) { background: rgba(0,0,100,0.04) !important; }
 h1{font-family: georgia; font-style: italic; font-weight: bold; font-size: 30px; letter-spacing: -1px;}
 h3{margin-top: 0}
 .tabitem{border: 0px}
@@ -425,9 +741,10 @@ nav img.rotate { animation: rotate 2s linear infinite; }
 #terminal { box-shadow: none !important; margin-bottom: 25px; background: rgba(0,0,0,0.03); }
 #terminal .generating { border: none !important; }
 #terminal label { position: absolute !important; }
-#container { margin-top: 50px; }
+.tabs { margin-top: 50px; }
 .hidden { display: none !important; }
 .codemirror-wrapper .cm-line { font-size: 12px !important; }
+label { font-weight: bold !important; }
 """
 
 js = """
@@ -455,112 +772,168 @@ function() {
     autoscroll.addEventListener("click", (e) => {
         autoscroll.classList.toggle("on")
     })
+    function debounce(fn, delay) {
+        let timeoutId;
+        return function(...args) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => fn(...args), delay);
+        };
+    }
+
+    function handleClick() {
+        console.log("refresh")
+        document.querySelector("#refresh").click();
+    }
+    const debouncedClick = debounce(handleClick, 1000);
+    document.addEventListener("input", debouncedClick);
+
 }
 """
 
+current_account = account_hf()
+print(f"current_account={current_account}")
+
 with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
-    output_components = []
-    with gr.Row():
-        gr.HTML("""<nav>
-    <img id='logo' src='/file=icon.png' width='80' height='80'>
-    <div class='flexible'></div>
-    <button id='autoscroll' class='on hidden'></button>
-</nav>
-""")
-    with gr.Row(elem_id='container'):
-        with gr.Column():
-            gr.Markdown(
-                """# Step 1. LoRA Info
-<p style="margin-top:0">Configure your LoRA train settings.</p>
-""", elem_classes="group_padding")
-            lora_name = gr.Textbox(
-                label="The name of your LoRA",
-                info="This has to be a unique name",
-                placeholder="e.g.: Persian Miniature Painting style, Cat Toy",
-            )
-            concept_sentence = gr.Textbox(
-                label="Trigger word/sentence",
-                info="Trigger word or sentence to be used",
-                placeholder="uncommon word like p3rs0n or trtcrd, or sentence like 'in the style of CNSTLL'",
-                interactive=True,
-            )
-            vram = gr.Radio(["20G", "16G", "12G" ], value="20G", label="VRAM", interactive=True)
-            num_repeats = gr.Number(value=10, precision=0, label="Repeat trains per image", interactive=True)
-            max_train_epochs = gr.Number(label="Max Train Epochs", value=16, interactive=True)
-            total_steps = gr.Number(0, interactive=False, label="Expected training steps")
-            sample_prompts = gr.Textbox("", lines=5, label="Sample Image Prompts (Separate with new lines)", interactive=True)
-            sample_every_n_steps = gr.Number(0, precision=0, label="Sample Image Every N Steps", interactive=True)
-            with gr.Accordion("Advanced options", open=False):
-                #resolution = gr.Number(label="Resolution", value=512, minimum=512, maximum=1024, step=512)
-                seed = gr.Number(label="Seed", value=42, interactive=True)
-                workers = gr.Number(label="Workers", value=2, interactive=True)
-                learning_rate = gr.Textbox(label="Learning Rate", value="8e-4", interactive=True)
-                #learning_rate = gr.Number(label="Learning Rate", value=4e-4, minimum=1e-6, maximum=1e-3, step=1e-6)
-
-                save_every_n_epochs = gr.Number(label="Save every N epochs", value=4, interactive=True)
-
-                guidance_scale = gr.Number(label="Guidance Scale", value=1.0, interactive=True)
-
-                timestep_sampling = gr.Textbox(label="Timestep Sampling", value="shift", interactive=True)
-
-    #            steps = gr.Number(label="Steps", value=1000, minimum=1, maximum=10000, step=1)
-                network_dim = gr.Number(label="LoRA Rank", value=4, minimum=4, maximum=128, step=4, interactive=True)
-                resolution = gr.Number(value=512, precision=0, label="Resize dataset images")
-        with gr.Column():
-            gr.Markdown(
-                """# Step 2. Dataset
-<p style="margin-top:0">Make sure the captions include the trigger word.</p>
-""", elem_classes="group_padding")
-            with gr.Group():
-                images = gr.File(
-                    file_types=["image", ".txt"],
-                    label="Upload your images",
-                    file_count="multiple",
-                    interactive=True,
-                    visible=True,
-                    scale=1,
-                )
-            with gr.Group(visible=False) as captioning_area:
-                do_captioning = gr.Button("Add AI captions with Florence-2")
-                output_components.append(captioning_area)
-                #output_components = [captioning_area]
-                caption_list = []
-                for i in range(1, MAX_IMAGES + 1):
-                    locals()[f"captioning_row_{i}"] = gr.Row(visible=False)
-                    with locals()[f"captioning_row_{i}"]:
-                        locals()[f"image_{i}"] = gr.Image(
-                            type="filepath",
-                            width=111,
-                            height=111,
-                            min_width=111,
-                            interactive=False,
-                            scale=2,
-                            show_label=False,
-                            show_share_button=False,
-                            show_download_button=False,
+    with gr.Tabs() as tabs:
+        with gr.TabItem("Gym"):
+            output_components = []
+            with gr.Row():
+                gr.HTML("""<nav>
+            <img id='logo' src='/file=icon.png' width='80' height='80'>
+            <div class='flexible'></div>
+            <button id='autoscroll' class='on hidden'></button>
+        </nav>
+        """)
+            with gr.Row(elem_id='container'):
+                with gr.Column():
+                    gr.Markdown(
+                        """# Step 1. LoRA Info
+        <p style="margin-top:0">Configure your LoRA train settings.</p>
+        """, elem_classes="group_padding")
+                    lora_name = gr.Textbox(
+                        label="The name of your LoRA",
+                        info="This has to be a unique name",
+                        placeholder="e.g.: Persian Miniature Painting style, Cat Toy",
+                    )
+                    concept_sentence = gr.Textbox(
+                        elem_id="--concept_sentence",
+                        label="Trigger word/sentence",
+                        info="Trigger word or sentence to be used",
+                        placeholder="uncommon word like p3rs0n or trtcrd, or sentence like 'in the style of CNSTLL'",
+                        interactive=True,
+                    )
+                    vram = gr.Radio(["20G", "16G", "12G" ], value="20G", label="VRAM", interactive=True)
+                    num_repeats = gr.Number(value=10, precision=0, label="Repeat trains per image", interactive=True)
+                    max_train_epochs = gr.Number(label="Max Train Epochs", value=16, interactive=True)
+                    total_steps = gr.Number(0, interactive=False, label="Expected training steps")
+                    sample_prompts = gr.Textbox("", lines=5, label="Sample Image Prompts (Separate with new lines)", interactive=True)
+                    sample_every_n_steps = gr.Number(0, precision=0, label="Sample Image Every N Steps", interactive=True)
+                    resolution = gr.Number(value=512, precision=0, label="Resize dataset images")
+                with gr.Column():
+                    gr.Markdown(
+                        """# Step 2. Dataset
+        <p style="margin-top:0">Make sure the captions include the trigger word.</p>
+        """, elem_classes="group_padding")
+                    with gr.Group():
+                        images = gr.File(
+                            file_types=["image", ".txt"],
+                            label="Upload your images",
+                            file_count="multiple",
+                            interactive=True,
+                            visible=True,
+                            scale=1,
                         )
-                        locals()[f"caption_{i}"] = gr.Textbox(
-                            label=f"Caption {i}", scale=15, interactive=True
-                        )
+                    with gr.Group(visible=False) as captioning_area:
+                        do_captioning = gr.Button("Add AI captions with Florence-2")
+                        output_components.append(captioning_area)
+                        #output_components = [captioning_area]
+                        caption_list = []
+                        for i in range(1, MAX_IMAGES + 1):
+                            locals()[f"captioning_row_{i}"] = gr.Row(visible=False)
+                            with locals()[f"captioning_row_{i}"]:
+                                locals()[f"image_{i}"] = gr.Image(
+                                    type="filepath",
+                                    width=111,
+                                    height=111,
+                                    min_width=111,
+                                    interactive=False,
+                                    scale=2,
+                                    show_label=False,
+                                    show_share_button=False,
+                                    show_download_button=False,
+                                )
+                                locals()[f"caption_{i}"] = gr.Textbox(
+                                    label=f"Caption {i}", scale=15, interactive=True
+                                )
 
-                    output_components.append(locals()[f"captioning_row_{i}"])
-                    output_components.append(locals()[f"image_{i}"])
-                    output_components.append(locals()[f"caption_{i}"])
-                    caption_list.append(locals()[f"caption_{i}"])
-        with gr.Column():
-            gr.Markdown(
-                """# Step 3. Train
-<p style="margin-top:0">Press start to start training.</p>
-""", elem_classes="group_padding")
-            start = gr.Button("Start training", visible=False)
-            output_components.append(start)
-            train_script = gr.Textbox(label="Train script", max_lines=100, interactive=True)
-            train_config = gr.Textbox(label="Train config", max_lines=100, interactive=True)
-    with gr.Row():
-        terminal = LogsView(label="Train log", elem_id="terminal")
-    with gr.Row():
-        gallery = gr.Gallery(get_samples, label="Samples", every=10, columns=6)
+                            output_components.append(locals()[f"captioning_row_{i}"])
+                            output_components.append(locals()[f"image_{i}"])
+                            output_components.append(locals()[f"caption_{i}"])
+                            caption_list.append(locals()[f"caption_{i}"])
+                with gr.Column():
+                    gr.Markdown(
+                        """# Step 3. Train
+        <p style="margin-top:0">Press start to start training.</p>
+        """, elem_classes="group_padding")
+                    refresh = gr.Button("Refresh", elem_id="refresh", visible=False)
+                    start = gr.Button("Start training", visible=False)
+                    output_components.append(start)
+                    train_script = gr.Textbox(label="Train script", max_lines=100, interactive=True)
+                    train_config = gr.Textbox(label="Train config", max_lines=100, interactive=True)
+            with gr.Accordion("Advanced options", elem_id='advanced_options', open=False):
+                with gr.Row():
+                    with gr.Column(min_width=300):
+                        seed = gr.Number(label="--seed", info="Seed", value=42, interactive=True)
+                    with gr.Column(min_width=300):
+                        workers = gr.Number(label="--max_data_loader_n_workers", info="Number of Workers", value=2, interactive=True)
+                    with gr.Column(min_width=300):
+                        learning_rate = gr.Textbox(label="--learning_rate", info="Learning Rate", value="8e-4", interactive=True)
+                    with gr.Column(min_width=300):
+                        save_every_n_epochs = gr.Number(label="--save_every_n_epochs", info="Save every N epochs", value=4, interactive=True)
+                    with gr.Column(min_width=300):
+                        guidance_scale = gr.Number(label="--guidance_scale", info="Guidance Scale", value=1.0, interactive=True)
+                    with gr.Column(min_width=300):
+                        timestep_sampling = gr.Textbox(label="--timestep_sampling", info="Timestep Sampling", value="shift", interactive=True)
+                    with gr.Column(min_width=300):
+                        network_dim = gr.Number(label="--network_dim", info="LoRA Rank", value=4, minimum=4, maximum=128, step=4, interactive=True)
+                    advanced_components, advanced_component_ids = init_advanced()
+            with gr.Row():
+                terminal = LogsView(label="Train log", elem_id="terminal")
+            with gr.Row():
+                gallery = gr.Gallery(get_samples, inputs=[lora_name], label="Samples", every=10, columns=6)
 
+        with gr.TabItem("Publish") as publish_tab:
+            hf_token = gr.Textbox(label="Huggingface Token")
+            hf_login = gr.Button("Login")
+            hf_logout = gr.Button("Logout")
+            with gr.Row() as row:
+                gr.Markdown("**LoRA**")
+                gr.Markdown("**Upload**")
+            loras = get_loras()
+            with gr.Row():
+                lora_rows = refresh_publish_tab()
+                with gr.Column():
+                    with gr.Row():
+                        repo_owner = gr.Textbox(label="Account", interactive=False)
+                        repo_name = gr.Textbox(label="Repository Name")
+                    repo_visibility = gr.Textbox(label="Repository Visibility ('public' or 'private')", value="public")
+                    upload_button = gr.Button("Upload to HuggingFace")
+                    upload_button.click(
+                        fn=upload_hf,
+                        inputs=[
+                            lora_rows,
+                            repo_owner,
+                            repo_name,
+                            repo_visibility,
+                            hf_token,
+                        ]
+                    )
+            hf_login.click(fn=login_hf, inputs=[hf_token], outputs=[hf_token, hf_login, hf_logout, repo_owner])
+            hf_logout.click(fn=logout_hf, outputs=[hf_token, hf_login, hf_logout, repo_owner])
+
+
+    publish_tab.select(refresh_publish_tab, outputs=lora_rows)
+    lora_rows.select(fn=set_repo, inputs=[lora_rows], outputs=[repo_name])
 
     dataset_folder = gr.State()
 
@@ -580,32 +953,24 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
         num_repeats,
         sample_prompts,
         sample_every_n_steps,
+        *advanced_components
     ]
-
-
-    for listener in listeners:
-        listener.change(update, inputs=listeners, outputs=[train_script, train_config, dataset_folder])
-
+    advanced_component_ids = [x.elem_id for x in advanced_components]
+    original_advanced_component_values = [comp.value for comp in advanced_components]
     images.upload(
         load_captioning,
         inputs=[images, concept_sentence],
         outputs=output_components
     )
-
     images.delete(
         load_captioning,
         inputs=[images, concept_sentence],
         outputs=output_components
     )
-
     images.clear(
         hide_captioning,
         outputs=[captioning_area, start]
     )
-
-
-    # update total steps
-
     max_train_epochs.change(
         fn=update_total_steps,
         inputs=[max_train_epochs, num_repeats, images],
@@ -616,7 +981,6 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
         inputs=[max_train_epochs, num_repeats, images],
         outputs=[total_steps]
     )
-
     images.upload(
         fn=update_total_steps,
         inputs=[max_train_epochs, num_repeats, images],
@@ -632,23 +996,20 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
         inputs=[max_train_epochs, num_repeats, images],
         outputs=[total_steps]
     )
-
-
     concept_sentence.change(fn=update_sample, inputs=[concept_sentence], outputs=sample_prompts)
-
     start.click(fn=create_dataset, inputs=[dataset_folder, resolution, images] + caption_list, outputs=dataset_folder).then(
         fn=start_training,
         inputs=[
+            lora_name,
             train_script,
             train_config,
             sample_prompts,
         ],
         outputs=terminal,
     )
-
     do_captioning.click(fn=run_captioning, inputs=[images, concept_sentence] + caption_list, outputs=caption_list)
-    demo.load(fn=loaded, js=js)
-
+    demo.load(fn=loaded, js=js, outputs=[hf_token, hf_login, hf_logout, repo_owner])
+    refresh.click(update, inputs=listeners, outputs=[train_script, train_config, dataset_folder])
 if __name__ == "__main__":
     cwd = os.path.dirname(os.path.abspath(__file__))
-    demo.launch(show_error=True, allowed_paths=[cwd])
+    demo.launch(debug=True, show_error=True, allowed_paths=[cwd])
