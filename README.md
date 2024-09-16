@@ -5,6 +5,8 @@ Dead simple web UI for training FLUX LoRA **with LOW VRAM (12GB/16GB/20GB) suppo
 - **Frontend:** The WebUI forked from [AI-Toolkit](https://github.com/ostris/ai-toolkit) (Gradio UI created by https://x.com/multimodalart)
 - **Backend:** The Training script powered by [Kohya Scripts](https://github.com/kohya-ss/sd-scripts)
 
+FluxGym supports 100% of Kohya sd-scripts features through an [Advanced](#advanced) tab, which is hidden by default.
+
 ![screenshot.png](screenshot.png)
 
 ---
@@ -226,3 +228,14 @@ The prompt weighting such as `( )` and `[ ]` also work. (Learn more about [Atten
 3. Once you're logged in, you will be able to select a trained LoRA from the dropdown, edit the name if you want, and publish to Huggingface.
 
 ![publish_to_hf.png](publish_to_hf.png)
+
+
+## Advanced
+
+The advanced tab is automatically constructed by parsing the launch flags available to the latest version of [kohya sd-scripts](https://github.com/kohya-ss/sd-scripts). This means Fluxgym is a full fledged UI for using the Kohya script.
+
+> By default the advanced tab is hidden. You can click the "advanced" accordion to expand it.
+
+![advanced.png](advanced.png)
+
+
