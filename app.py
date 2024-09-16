@@ -72,7 +72,7 @@ license: {license}
 
 # {lora_name}
 
-Trained with [Fluxgym](https://github.com/cocktailpeanut/fluxgym)
+A Flux LoRA trained on a local computer with [Fluxgym](https://github.com/cocktailpeanut/fluxgym)
 
 <Gallery />
 
