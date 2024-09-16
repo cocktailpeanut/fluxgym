@@ -88,12 +88,15 @@ def create_dataset(destination_folder, size, *inputs):
     for index, image in enumerate(images):
         # copy the images to the datasets folder
         new_image_path = shutil.copy(image, destination_folder)
-
-        # resize the images
+        
+        # if it's a caption text file skip the next bit
+        ext = os.path.splitext(new_image_path)[-1].lower()   
+        if ext == '.txt':
+            continue
+            
         resize_image(new_image_path, new_image_path, size)
-
+        
         # copy the captions
-
         original_caption = inputs[index + 1]
 
         image_file_name = os.path.basename(new_image_path)
