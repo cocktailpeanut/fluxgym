@@ -11,13 +11,6 @@ FluxGym supports 100% of Kohya sd-scripts features through an [Advanced](#advanc
 
 ---
 
-# How people are using Fluxgym
-
-Here are people using Fluxgym to locally train Lora sharing their experience:
-
-https://pinokio.computer/item?uri=https://github.com/cocktailpeanut/fluxgym
-
----
 
 # What is this?
 
@@ -26,6 +19,22 @@ https://pinokio.computer/item?uri=https://github.com/cocktailpeanut/fluxgym
 3. [Kohya Scripts](https://github.com/kohya-ss/sd-scripts) are very flexible and powerful for training FLUX, but you need to run in terminal.
 4. What if you could have the simplicity of AI-Toolkit WebUI and the flexibility of Kohya Scripts?
 5. Flux Gym was born. Supports 12GB, 16GB, 20GB VRAMs, and extensible since it uses Kohya Scripts underneath.
+
+---
+
+# News
+
+- September 16: Added "Publish to Huggingface" + 100% Kohya sd-scripts feature support: https://x.com/cocktailpeanut/status/1835719701172756592
+- September 11: Automatic Sample Image Generation + Custom Resolution: https://x.com/cocktailpeanut/status/1833881392482066638
+
+---
+
+# How people are using Fluxgym
+
+Here are people using Fluxgym to locally train Lora sharing their experience:
+
+https://pinokio.computer/item?uri=https://github.com/cocktailpeanut/fluxgym
+
 
 # More Info
 
