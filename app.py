@@ -648,4 +648,4 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
 
 if __name__ == "__main__":
     cwd = os.path.dirname(os.path.abspath(__file__))
-    demo.launch(show_error=True, allowed_paths=[cwd], server_name="0.0.0.0")
+    demo.launch(show_error=True, allowed_paths=[cwd])
