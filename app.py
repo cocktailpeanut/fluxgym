@@ -1,5 +1,9 @@
 import os
 import sys
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+os.environ['GRADIO_ANALYTICS_ENABLED'] = '0'
+sys.path.insert(0, os.getcwd())
+sys.path.append(os.path.join(os.path.dirname(__file__), 'sd-scripts'))
 import subprocess
 import gradio as gr
 from PIL import Image
@@ -17,10 +21,6 @@ from argparse import Namespace
 import train_network
 import toml
 import re
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
-os.environ['GRADIO_ANALYTICS_ENABLED'] = '0'
-sys.path.insert(0, os.getcwd())
-sys.path.append(os.path.join(os.path.dirname(__file__), 'sd-scripts'))
 MAX_IMAGES = 150
 def readme(lora_name, instance_prompt, sample_prompts):
     base_model = "black-forest-labs/FLUX.1-dev"

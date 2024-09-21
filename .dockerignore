@@ -1,0 +1,16 @@
+.cache/
+cudnn_windows/
+bitsandbytes_windows/
+bitsandbytes_windows_deprecated/
+dataset/
+__pycache__/
+venv/
+**/.hadolint.yml
+**/*.log
+**/.git
+**/.gitignore
+**/.env
+**/.github
+**/.vscode
+**/*.ps1
+sd-scripts/
