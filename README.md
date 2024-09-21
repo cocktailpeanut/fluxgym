@@ -146,6 +146,23 @@ requirements.txt
 ...
 ```
 
+## 3. Install via Docker
+
+First clone Fluxgym and kohya-ss/sd-scripts:
+
+```
+git clone https://github.com/cocktailpeanut/fluxgym
+cd fluxgym
+git clone -b sd3 https://github.com/kohya-ss/sd-scripts
+```
+
+Now build the image and run it via `docker-compose`:
+```
+docker compose up -d --build
+```
+
+Open web browser and goto the IP address of the computer/VM: http://localhost:7860
+
 # Start
 
 Go back to the root `fluxgym` folder, with the venv activated, run:

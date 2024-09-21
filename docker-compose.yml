@@ -1,0 +1,25 @@
+services:
+
+  fluxgym:
+    build: .
+    image: fluxgym
+    container_name: fluxgym
+    ports:
+      - 7860:7860
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./:/app/fluxgym
+    stop_signal: SIGKILL
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+    restart: unless-stopped
