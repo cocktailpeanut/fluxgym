@@ -17,8 +17,6 @@ RUN groupadd -g "${PGID}" appuser
 # Create a user with the specified UID and GID
 RUN useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
 
-# RUN useradd -m -s /bin/sh -u 1000 appuser
-
 WORKDIR /app
 
 # Get sd-scripts from kohya-ss and install them
