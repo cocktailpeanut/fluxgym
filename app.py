@@ -328,7 +328,7 @@ def download(base_model):
     model_path = os.path.join(model_folder, model_file)
     os.makedirs(model_folder, exist_ok=True)
     if not os.path.exists(model_path):
-        gr.Info(f"Downloading base model: {base_model}. Please wait. (You can check the terminal for the download progress)")
+        gr.Info(f"Downloading base model: {base_model}. Please wait. (You can check the terminal for the download progress)", duration=None)
         print(f"download {base_model}")
         hf_hub_download(repo_id=repo, local_dir=model_folder, filename=model_file)
 
