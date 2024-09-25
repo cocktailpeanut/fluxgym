@@ -109,42 +109,9 @@ pip install -r requirements.txt
 Finally, install pytorch Nightly:
 
 ```
-pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121
+pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
 
-Now let's download the model checkpoints.
-
-First, download the following models under the `models/clip` foder:
-
-- https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true
-- https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true
-
-Second, download the following model under the `models/vae` folder:
-
-- https://huggingface.co/cocktailpeanut/xulf-dev/resolve/main/ae.sft?download=true
-
-Finally, download the following model under the `models/unet` folder:
-
-- https://huggingface.co/cocktailpeanut/xulf-dev/resolve/main/flux1-dev.sft?download=true
-
-The result file structure will be something like:
-
-```
-/models
-  /clip
-    clip_l.safetensors
-    t5xxl_fp16.safetensors
-  /unet
-    flux1-dev.sft
-  /vae
-    ae.sft
-/sd-scripts
-/outputs
-/env
-app.py
-requirements.txt
-...
-```
 
 # Start
 

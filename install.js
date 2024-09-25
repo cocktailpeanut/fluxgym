@@ -58,34 +58,34 @@ module.exports = {
         ]
       }
     },
-    {
-      method: "fs.download",
-      params: {
-        uri: [
-          "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true",
-          "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true",
-        ],
-        dir: "models/clip"
-      }
-    },
-    {
-      method: "fs.download",
-      params: {
-        uri: [
-          "https://huggingface.co/cocktailpeanut/xulf-dev/resolve/main/ae.sft?download=true",
-        ],
-        dir: "models/vae"
-      }
-    },
-    {
-      method: "fs.download",
-      params: {
-        uri: [
-          "https://huggingface.co/cocktailpeanut/xulf-dev/resolve/main/flux1-dev.sft?download=true",
-        ],
-        dir: "models/unet"
-      }
-    },
+//    {
+//      method: "fs.download",
+//      params: {
+//        uri: [
+//          "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true",
+//          "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true",
+//        ],
+//        dir: "models/clip"
+//      }
+//    },
+//    {
+//      method: "fs.download",
+//      params: {
+//        uri: [
+//          "https://huggingface.co/cocktailpeanut/xulf-dev/resolve/main/ae.sft?download=true",
+//        ],
+//        dir: "models/vae"
+//      }
+//    },
+//    {
+//      method: "fs.download",
+//      params: {
+//        uri: [
+//          "https://huggingface.co/cocktailpeanut/xulf-dev/resolve/main/flux1-dev.sft?download=true",
+//        ],
+//        dir: "models/unet"
+//      }
+//    },
     {
       method: "fs.link",
       params: {

@@ -22,11 +22,35 @@ import train_network
 import toml
 import re
 MAX_IMAGES = 150
-def readme(lora_name, instance_prompt, sample_prompts):
-    base_model = "black-forest-labs/FLUX.1-dev"
-    license = "other"
-    license_name = "flux-1-dev-non-commercial-license"
-    license_link = "https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/LICENSE.md"
+
+with open('models.yaml', 'r') as file:
+    models = yaml.safe_load(file)
+
+def readme(base_model, lora_name, instance_prompt, sample_prompts):
+
+    # model license
+    model_config = models[base_model]
+    model_file = model_config["file"]
+    repo = model_config["repo"]
+    base_model_name = model_config["base"]
+    license = None
+    license_name = None
+    license_link = None
+    license_items = []
+    if "license" in model_config:
+        license = model_config["license"]
+        license_items.append(f"license: {license}")
+    if "license_name" in model_config:
+        license_name = model_config["license_name"]
+        license_items.append(f"license_name: {license_name}")
+    if "license_link" in model_config:
+        license_link = model_config["license_link"]
+        license_items.append(f"license_link: {license_link}")
+    license_str = "\n".join(license_items)
+    print(f"license_items={license_items}")
+    print(f"license_str = {license_str}")
+
+    # tags
     tags = [ "text-to-image", "flux", "lora", "diffusers", "template:sd-lora", "fluxgym" ]
 
     # widgets
@@ -63,11 +87,9 @@ tags:
 {yaml.dump(tags, indent=4).strip()}
 {"widget:" if os.path.isdir(samples_dir) else ""}
 {yaml.dump(widgets, indent=4).strip() if widgets else ""}
-base_model: {base_model}
+base_model: {base_model_name}
 {"instance_prompt: " + instance_prompt if instance_prompt else ""}
-license: {license}
-{'license_name: ' + license_name if license == "other" else ""}
-{'license_link: ' + license_link if license == "other" else ""}
+{license_str}
 ---
 
 # {lora_name}
@@ -130,30 +152,10 @@ def login_hf(hf_token):
         print(f"incorrect hf_token")
         return gr.update(), gr.update(), gr.update(), gr.update()
 
-def upload_hf(lora_rows, repo_owner, repo_name, repo_visibility, hf_token):
+def upload_hf(base_model, lora_rows, repo_owner, repo_name, repo_visibility, hf_token):
     src = lora_rows
     repo_id = f"{repo_owner}/{repo_name}"
     gr.Info(f"Uploading to Huggingface. Please Stand by...", duration=None)
-    print(f"repo_id={repo_id} repo_visibility={repo_visibility} src={src}")
-    lora_name = os.path.basename(src)
-    dataset_toml_path = os.path.normpath(os.path.join(src, "dataset.toml"))
-    print(f"lora_name={lora_name}, dataset_toml_path={dataset_toml_path}")
-    with open(dataset_toml_path, 'r') as f:
-        config = toml.load(f)
-    concept_sentence = config['datasets'][0]['subsets'][0]['class_tokens']
-    print(f"concept_sentence={concept_sentence}")
-    # Generate README
-    output_name = slugify(lora_name)
-    print(f"lora_name {lora_name}, concept_sentence={concept_sentence}, output_name={output_name}")
-    sample_prompts_path = resolve_path_without_quotes(f"outputs/{output_name}/sample_prompts.txt")
-    with open(sample_prompts_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-    sample_prompts = [line.strip() for line in lines if len(line.strip()) > 0 and line[0] != "#"]
-    md = readme(lora_name, concept_sentence, sample_prompts)
-    # Write README
-    readme_path = resolve_path_without_quotes(f"outputs/{output_name}/README.md")
-    with open(readme_path, "w", encoding="utf-8") as f:
-        f.write(md)
     args = Namespace(
         huggingface_repo_id=repo_id,
         huggingface_repo_type="model",
@@ -313,6 +315,48 @@ def recursive_update(d, u):
             d[k] = v
     return d
 
+def download(base_model):
+    model = models[base_model]
+    model_file = model["file"]
+    repo = model["repo"]
+
+    # download unet
+    if base_model == "flux-dev" or base_model == "flux-schnell":
+        unet_folder = "models/unet"
+    else:
+        unet_folder = f"models/unet/{repo}"
+    unet_path = os.path.join(unet_folder, model_file)
+    if not os.path.exists(unet_path):
+        os.makedirs(unet_folder, exist_ok=True)
+        gr.Info(f"Downloading base model: {base_model}. Please wait. (You can check the terminal for the download progress)", duration=None)
+        print(f"download {base_model}")
+        hf_hub_download(repo_id=repo, local_dir=unet_folder, filename=model_file)
+
+    # download vae
+    vae_folder = "models/vae"
+    vae_path = os.path.join(vae_folder, "ae.sft")
+    if not os.path.exists(vae_path):
+        os.makedirs(vae_folder, exist_ok=True)
+        gr.Info(f"Downloading vae")
+        print(f"downloading ae.sft...")
+        hf_hub_download(repo_id="cocktailpeanut/xulf-dev", local_dir=vae_folder, filename="ae.sft")
+
+    # download clip
+    clip_folder = "models/clip"
+    clip_l_path = os.path.join(clip_folder, "clip_l.safetensors")
+    if not os.path.exists(clip_l_path):
+        os.makedirs(clip_folder, exist_ok=True)
+        gr.Info(f"Downloading clip...")
+        print(f"download clip_l.safetensors")
+        hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="clip_l.safetensors")
+
+    # download t5xxl
+    t5xxl_path = os.path.join(clip_folder, "t5xxl_fp16.safetensors")
+    if not os.path.exists(t5xxl_path):
+        print(f"download t5xxl_fp16.safetensors")
+        gr.Info(f"Downloading t5xxl...")
+        hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="t5xxl_fp16.safetensors")
+
 
 def resolve_path(p):
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -324,6 +368,7 @@ def resolve_path_without_quotes(p):
     return norm_path
 
 def gen_sh(
+    base_model,
     output_name,
     resolution,
     seed,
@@ -358,6 +403,13 @@ def gen_sh(
 
 
     ############# Optimizer args ########################
+#    if vram == "8G":
+#        optimizer = f"""--optimizer_type adafactor {line_break}
+#    --optimizer_args "relative_step=False" "scale_parameter=False" "warmup_init=False" {line_break}
+#        --split_mode {line_break}
+#        --network_args "train_blocks=single" {line_break}
+#        --lr_scheduler constant_with_warmup {line_break}
+#        --max_grad_norm 0.0 {line_break}"""
     if vram == "16G":
         # 16G VRAM
         optimizer = f"""--optimizer_type adafactor {line_break}
@@ -378,7 +430,16 @@ def gen_sh(
 
 
     #######################################################
-    pretrained_model_path = resolve_path("models/unet/flux1-dev.sft")
+    model_config = models[base_model]
+    model_file = model_config["file"]
+    repo = model_config["repo"]
+    if base_model == "flux-dev" or base_model == "flux-schnell":
+        model_folder = "models/unet"
+    else:
+        model_folder = f"models/unet/{repo}"
+    model_path = os.path.join(model_folder, model_file)
+    pretrained_model_path = resolve_path(model_path)
+
     clip_path = resolve_path("models/clip/clip_l.safetensors")
     t5_path = resolve_path("models/clip/t5xxl_fp16.safetensors")
     ae_path = resolve_path("models/vae/ae.sft")
@@ -499,18 +560,23 @@ def get_samples(lora_name):
         return []
 
 def start_training(
+    base_model,
     lora_name,
     train_script,
     train_config,
     sample_prompts,
 ):
     # write custom script and toml
-    os.makedirs("models", exist_ok=True)
-    os.makedirs("outputs", exist_ok=True)
+    if not os.path.exists("models"):
+        os.makedirs("models", exist_ok=True)
+    if not os.path.exists("outputs"):
+        os.makedirs("outputs", exist_ok=True)
     output_name = slugify(lora_name)
     output_dir = resolve_path_without_quotes(f"outputs/{output_name}")
-    os.makedirs(output_dir, exist_ok=True)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
 
+    download(base_model)
 
     file_type = "sh"
     if sys.platform == "win32":
@@ -547,10 +613,26 @@ def start_training(
     gr.Info(f"Started training")
     yield from runner.run_command([command], cwd=cwd)
     yield runner.log(f"Runner: {runner}")
+
+    # Generate Readme
+    config = toml.loads(train_config)
+    concept_sentence = config['datasets'][0]['subsets'][0]['class_tokens']
+    print(f"concept_sentence={concept_sentence}")
+    print(f"lora_name {lora_name}, concept_sentence={concept_sentence}, output_name={output_name}")
+    sample_prompts_path = resolve_path_without_quotes(f"outputs/{output_name}/sample_prompts.txt")
+    with open(sample_prompts_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    sample_prompts = [line.strip() for line in lines if len(line.strip()) > 0 and line[0] != "#"]
+    md = readme(base_model, lora_name, concept_sentence, sample_prompts)
+    readme_path = resolve_path_without_quotes(f"outputs/{output_name}/README.md")
+    with open(readme_path, "w", encoding="utf-8") as f:
+        f.write(md)
+
     gr.Info(f"Training Complete. Check the outputs folder for the LoRA files.", duration=None)
 
 
 def update(
+    base_model,
     lora_name,
     resolution,
     seed,
@@ -571,6 +653,7 @@ def update(
     output_name = slugify(lora_name)
     dataset_folder = str(f"datasets/{output_name}")
     sh = gen_sh(
+        base_model,
         output_name,
         resolution,
         seed,
@@ -745,6 +828,7 @@ nav img.rotate { animation: rotate 2s linear infinite; }
 .hidden { display: none !important; }
 .codemirror-wrapper .cm-line { font-size: 12px !important; }
 label { font-weight: bold !important; }
+#start_training.clicked { background: silver; color: black; }
 """
 
 js = """
@@ -787,6 +871,11 @@ function() {
     const debouncedClick = debounce(handleClick, 1000);
     document.addEventListener("input", debouncedClick);
 
+    document.querySelector("#start_training").addEventListener("click", (e) => {
+      e.target.classList.add("clicked")
+      e.target.innerHTML = "Training..."
+    })
+
 }
 """
 
@@ -822,6 +911,9 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                         placeholder="uncommon word like p3rs0n or trtcrd, or sentence like 'in the style of CNSTLL'",
                         interactive=True,
                     )
+                    model_names = list(models.keys())
+                    print(f"model_names={model_names}")
+                    base_model = gr.Dropdown(label="Base model (edit the models.yaml file to add more to this list)", choices=model_names, value=model_names[0])
                     vram = gr.Radio(["20G", "16G", "12G" ], value="20G", label="VRAM", interactive=True)
                     num_repeats = gr.Number(value=10, precision=0, label="Repeat trains per image", interactive=True)
                     max_train_epochs = gr.Number(label="Max Train Epochs", value=16, interactive=True)
@@ -876,7 +968,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
         <p style="margin-top:0">Press start to start training.</p>
         """, elem_classes="group_padding")
                     refresh = gr.Button("Refresh", elem_id="refresh", visible=False)
-                    start = gr.Button("Start training", visible=False)
+                    start = gr.Button("Start training", visible=False, elem_id="start_training")
                     output_components.append(start)
                     train_script = gr.Textbox(label="Train script", max_lines=100, interactive=True)
                     train_config = gr.Textbox(label="Train config", max_lines=100, interactive=True)
@@ -921,6 +1013,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                     upload_button.click(
                         fn=upload_hf,
                         inputs=[
+                            base_model,
                             lora_rows,
                             repo_owner,
                             repo_name,
@@ -938,6 +1031,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     dataset_folder = gr.State()
 
     listeners = [
+        base_model,
         lora_name,
         resolution,
         seed,
@@ -1000,6 +1094,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     start.click(fn=create_dataset, inputs=[dataset_folder, resolution, images] + caption_list, outputs=dataset_folder).then(
         fn=start_training,
         inputs=[
+            base_model,
             lora_name,
             train_script,
             train_config,
