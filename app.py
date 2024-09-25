@@ -799,6 +799,7 @@ nav img.rotate { animation: rotate 2s linear infinite; }
 .hidden { display: none !important; }
 .codemirror-wrapper .cm-line { font-size: 12px !important; }
 label { font-weight: bold !important; }
+#start_training.clicked { background: silver; color: black; }
 """
 
 js = """
@@ -840,6 +841,11 @@ function() {
     }
     const debouncedClick = debounce(handleClick, 1000);
     document.addEventListener("input", debouncedClick);
+
+    document.querySelector("#start_training").addEventListener("click", (e) => {
+      e.target.classList.add("clicked")
+      e.target.innerHTML = "Training..."
+    })
 
 }
 """
@@ -933,7 +939,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
         <p style="margin-top:0">Press start to start training.</p>
         """, elem_classes="group_padding")
                     refresh = gr.Button("Refresh", elem_id="refresh", visible=False)
-                    start = gr.Button("Start training", visible=False)
+                    start = gr.Button("Start training", visible=False, elem_id="start_training")
                     output_components.append(start)
                     train_script = gr.Textbox(label="Train script", max_lines=100, interactive=True)
                     train_config = gr.Textbox(label="Train config", max_lines=100, interactive=True)
