@@ -24,8 +24,22 @@ FluxGym supports 100% of Kohya sd-scripts features through an [Advanced](#advanc
 
 # News
 
+- September 25: Docker support + Autodownload Models (No need to manually download models when setting up) + Support custom base models (not just flux-dev but anything, just need to include in the [models.yaml](models.yaml) file.
 - September 16: Added "Publish to Huggingface" + 100% Kohya sd-scripts feature support: https://x.com/cocktailpeanut/status/1835719701172756592
 - September 11: Automatic Sample Image Generation + Custom Resolution: https://x.com/cocktailpeanut/status/1833881392482066638
+
+---
+
+# Supported Models
+
+1. Flux1-dev
+2. Flux1-dev2pro (as explained here: https://medium.com/@zhiwangshi28/why-flux-lora-so-hard-to-train-and-how-to-overcome-it-a0c70bc59eaf)
+3. Flux1-schnell (Couldn't get high quality results, so not really recommended, but feel free to experiment with it)
+4. More?
+
+The models are automatically downloaded when you start training with the model selected.
+
+You can easily add more to the supported models list by editing the [models.yaml](models.yaml) file. If you want to share some interesting base models, please send a PR.
 
 ---
 
