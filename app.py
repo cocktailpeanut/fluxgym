@@ -22,11 +22,35 @@ import train_network
 import toml
 import re
 MAX_IMAGES = 150
-def readme(lora_name, instance_prompt, sample_prompts):
-    base_model = "black-forest-labs/FLUX.1-dev"
-    license = "other"
-    license_name = "flux-1-dev-non-commercial-license"
-    license_link = "https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/LICENSE.md"
+
+with open('models.yaml', 'r') as file:
+    models = yaml.safe_load(file)
+
+def readme(base_model, lora_name, instance_prompt, sample_prompts):
+
+    # model license
+    model_config = models[base_model]
+    model_file = model_config["file"]
+    repo = model_config["repo"]
+    base_model_name = model_config["base"]
+    license = None
+    license_name = None
+    license_link = None
+    license_items = []
+    if "license" in model_config:
+        license = model_config["license"]
+        license_items.append(f"license: {license}")
+    if "license_name" in model_config:
+        license_name = model_config["license_name"]
+        license_items.append(f"license_name: {license_name}")
+    if "license_link" in model_config:
+        license_link = model_config["license_link"]
+        license_items.append(f"license_link: {license_link}")
+    license_str = "\n".join(license_items)
+    print(f"license_items={license_items}")
+    print(f"license_str = {license_str}")
+
+    # tags
     tags = [ "text-to-image", "flux", "lora", "diffusers", "template:sd-lora", "fluxgym" ]
 
     # widgets
@@ -63,11 +87,9 @@ tags:
 {yaml.dump(tags, indent=4).strip()}
 {"widget:" if os.path.isdir(samples_dir) else ""}
 {yaml.dump(widgets, indent=4).strip() if widgets else ""}
-base_model: {base_model}
+base_model: {base_model_name}
 {"instance_prompt: " + instance_prompt if instance_prompt else ""}
-license: {license}
-{'license_name: ' + license_name if license == "other" else ""}
-{'license_link: ' + license_link if license == "other" else ""}
+{license_str}
 ---
 
 # {lora_name}
@@ -130,30 +152,10 @@ def login_hf(hf_token):
         print(f"incorrect hf_token")
         return gr.update(), gr.update(), gr.update(), gr.update()
 
-def upload_hf(lora_rows, repo_owner, repo_name, repo_visibility, hf_token):
+def upload_hf(base_model, lora_rows, repo_owner, repo_name, repo_visibility, hf_token):
     src = lora_rows
     repo_id = f"{repo_owner}/{repo_name}"
     gr.Info(f"Uploading to Huggingface. Please Stand by...", duration=None)
-    print(f"repo_id={repo_id} repo_visibility={repo_visibility} src={src}")
-    lora_name = os.path.basename(src)
-    dataset_toml_path = os.path.normpath(os.path.join(src, "dataset.toml"))
-    print(f"lora_name={lora_name}, dataset_toml_path={dataset_toml_path}")
-    with open(dataset_toml_path, 'r') as f:
-        config = toml.load(f)
-    concept_sentence = config['datasets'][0]['subsets'][0]['class_tokens']
-    print(f"concept_sentence={concept_sentence}")
-    # Generate README
-    output_name = slugify(lora_name)
-    print(f"lora_name {lora_name}, concept_sentence={concept_sentence}, output_name={output_name}")
-    sample_prompts_path = resolve_path_without_quotes(f"outputs/{output_name}/sample_prompts.txt")
-    with open(sample_prompts_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-    sample_prompts = [line.strip() for line in lines if len(line.strip()) > 0 and line[0] != "#"]
-    md = readme(lora_name, concept_sentence, sample_prompts)
-    # Write README
-    readme_path = resolve_path_without_quotes(f"outputs/{output_name}/README.md")
-    with open(readme_path, "w", encoding="utf-8") as f:
-        f.write(md)
     args = Namespace(
         huggingface_repo_id=repo_id,
         huggingface_repo_type="model",
@@ -313,6 +315,22 @@ def recursive_update(d, u):
             d[k] = v
     return d
 
+def download(base_model):
+    model = models[base_model]
+    model_file = model["file"]
+    repo = model["repo"]
+
+    if base_model == "flux-dev" or base_model == "flux-schnell":
+        model_folder = "models/unet"
+    else:
+        model_folder = f"models/unet/{repo}"
+    # download if it doesn't exist
+    model_path = os.path.join(model_folder, model_file)
+    os.makedirs(model_folder, exist_ok=True)
+    if not os.path.exists(model_path):
+        gr.Info(f"Downloading base model: {base_model}. Please wait. (You can check the terminal for the download progress)")
+        print(f"download {base_model}")
+        hf_hub_download(repo_id=repo, local_dir=model_folder, filename=model_file)
 
 def resolve_path(p):
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -324,6 +342,7 @@ def resolve_path_without_quotes(p):
     return norm_path
 
 def gen_sh(
+    base_model,
     output_name,
     resolution,
     seed,
@@ -358,6 +377,13 @@ def gen_sh(
 
 
     ############# Optimizer args ########################
+#    if vram == "8G":
+#        optimizer = f"""--optimizer_type adafactor {line_break}
+#    --optimizer_args "relative_step=False" "scale_parameter=False" "warmup_init=False" {line_break}
+#        --split_mode {line_break}
+#        --network_args "train_blocks=single" {line_break}
+#        --lr_scheduler constant_with_warmup {line_break}
+#        --max_grad_norm 0.0 {line_break}"""
     if vram == "16G":
         # 16G VRAM
         optimizer = f"""--optimizer_type adafactor {line_break}
@@ -378,7 +404,16 @@ def gen_sh(
 
 
     #######################################################
-    pretrained_model_path = resolve_path("models/unet/flux1-dev.sft")
+    model_config = models[base_model]
+    model_file = model_config["file"]
+    repo = model_config["repo"]
+    if base_model == "flux-dev" or base_model == "flux-schnell":
+        model_folder = "models/unet"
+    else:
+        model_folder = f"models/unet/{repo}"
+    model_path = os.path.join(model_folder, model_file)
+    pretrained_model_path = resolve_path(model_path)
+
     clip_path = resolve_path("models/clip/clip_l.safetensors")
     t5_path = resolve_path("models/clip/t5xxl_fp16.safetensors")
     ae_path = resolve_path("models/vae/ae.sft")
@@ -499,6 +534,7 @@ def get_samples(lora_name):
         return []
 
 def start_training(
+    base_model,
     lora_name,
     train_script,
     train_config,
@@ -511,6 +547,7 @@ def start_training(
     output_dir = resolve_path_without_quotes(f"outputs/{output_name}")
     os.makedirs(output_dir, exist_ok=True)
 
+    download(base_model)
 
     file_type = "sh"
     if sys.platform == "win32":
@@ -547,10 +584,26 @@ def start_training(
     gr.Info(f"Started training")
     yield from runner.run_command([command], cwd=cwd)
     yield runner.log(f"Runner: {runner}")
+
+    # Generate Readme
+    config = toml.loads(train_config)
+    concept_sentence = config['datasets'][0]['subsets'][0]['class_tokens']
+    print(f"concept_sentence={concept_sentence}")
+    print(f"lora_name {lora_name}, concept_sentence={concept_sentence}, output_name={output_name}")
+    sample_prompts_path = resolve_path_without_quotes(f"outputs/{output_name}/sample_prompts.txt")
+    with open(sample_prompts_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    sample_prompts = [line.strip() for line in lines if len(line.strip()) > 0 and line[0] != "#"]
+    md = readme(base_model, lora_name, concept_sentence, sample_prompts)
+    readme_path = resolve_path_without_quotes(f"outputs/{output_name}/README.md")
+    with open(readme_path, "w", encoding="utf-8") as f:
+        f.write(md)
+
     gr.Info(f"Training Complete. Check the outputs folder for the LoRA files.", duration=None)
 
 
 def update(
+    base_model,
     lora_name,
     resolution,
     seed,
@@ -571,6 +624,7 @@ def update(
     output_name = slugify(lora_name)
     dataset_folder = str(f"datasets/{output_name}")
     sh = gen_sh(
+        base_model,
         output_name,
         resolution,
         seed,
@@ -822,6 +876,9 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                         placeholder="uncommon word like p3rs0n or trtcrd, or sentence like 'in the style of CNSTLL'",
                         interactive=True,
                     )
+                    model_names = list(models.keys())
+                    print(f"model_names={model_names}")
+                    base_model = gr.Dropdown(label="Base model (edit the models.yaml file to add more to this list)", choices=model_names, value=model_names[0])
                     vram = gr.Radio(["20G", "16G", "12G" ], value="20G", label="VRAM", interactive=True)
                     num_repeats = gr.Number(value=10, precision=0, label="Repeat trains per image", interactive=True)
                     max_train_epochs = gr.Number(label="Max Train Epochs", value=16, interactive=True)
@@ -921,6 +978,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                     upload_button.click(
                         fn=upload_hf,
                         inputs=[
+                            base_model,
                             lora_rows,
                             repo_owner,
                             repo_name,
@@ -938,6 +996,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     dataset_folder = gr.State()
 
     listeners = [
+        base_model,
         lora_name,
         resolution,
         seed,
@@ -1000,6 +1059,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     start.click(fn=create_dataset, inputs=[dataset_folder, resolution, images] + caption_list, outputs=dataset_folder).then(
         fn=start_training,
         inputs=[
+            base_model,
             lora_name,
             train_script,
             train_config,

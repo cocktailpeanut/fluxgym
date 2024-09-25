@@ -1,0 +1,19 @@
+flux-dev:
+    repo: cocktailpeanut/xulf-dev
+    base: black-forest-labs/FLUX.1-dev
+    license: other
+    license_name: flux-1-dev-non-commercial-license
+    license_link: https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/LICENSE.md
+    file: flux1-dev.sft
+flux-schnell:
+    repo: black-forest-labs/FLUX.1-schnell
+    base: black-forest-labs/FLUX.1-schnell
+    license: apache-2.0
+    file: flux1-schnell.safetensors
+bdsqlsz/flux1-dev2pro-single:
+    repo: bdsqlsz/flux1-dev2pro-single
+    base: black-forest-labs/FLUX.1-dev
+    license: other
+    license_name: flux-1-dev-non-commercial-license
+    license_link: https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/LICENSE.md
+    file: flux1-dev2pro.safetensors
