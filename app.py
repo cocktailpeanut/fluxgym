@@ -346,13 +346,13 @@ def download(base_model):
     if not os.path.exists(clip_l_path):
         os.makedirs(clip_folder, exist_ok=True)
         print(f"download clip_l.safetensors")
-        hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename=clip_l_path)
+        hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="clip_l.safetensors")
 
     # download t5xxl
     t5xxl_path = os.path.join(clip_folder, "t5xxl_fp16.safetensors")
     if not os.path.exists(t5xxl_path):
         print(f"download t5xxl_fp16.safetensors")
-        hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename=t5xxl_path)
+        hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="t5xxl_fp16.safetensors")
 
 
 def resolve_path(p):
