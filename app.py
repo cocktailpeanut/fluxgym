@@ -31,7 +31,7 @@ def readme(base_model, lora_name, instance_prompt, sample_prompts):
     # model license
     model_config = models[base_model]
     model_file = model_config["file"]
-    base_model_name = model_config["repo"]
+    base_model_name = model_config["base"]
     license = None
     license_name = None
     license_link = None
