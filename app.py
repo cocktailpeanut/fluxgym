@@ -337,7 +337,8 @@ def download(base_model):
     vae_path = os.path.join(vae_folder, "ae.sft")
     if not os.path.exists(vae_path):
         os.makedirs(vae_folder, exist_ok=True)
-        print(f"downloading ae.sft")
+        gr.Info(f"Downloading vae")
+        print(f"downloading ae.sft...")
         hf_hub_download(repo_id="cocktailpeanut/xulf-dev", local_dir=vae_folder, filename="ae.sft")
 
     # download clip
@@ -345,6 +346,7 @@ def download(base_model):
     clip_l_path = os.path.join(clip_folder, "clip_l.safetensors")
     if not os.path.exists(clip_l_path):
         os.makedirs(clip_folder, exist_ok=True)
+        gr.Info(f"Downloading clip...")
         print(f"download clip_l.safetensors")
         hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="clip_l.safetensors")
 
@@ -352,6 +354,7 @@ def download(base_model):
     t5xxl_path = os.path.join(clip_folder, "t5xxl_fp16.safetensors")
     if not os.path.exists(t5xxl_path):
         print(f"download t5xxl_fp16.safetensors")
+        gr.Info(f"Downloading t5xxl...")
         hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="t5xxl_fp16.safetensors")
 
 
