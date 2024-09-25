@@ -326,25 +326,25 @@ def download(base_model):
     else:
         unet_folder = f"models/unet/{repo}"
     unet_path = os.path.join(unet_folder, model_file)
-    os.makedirs(unet_folder, exist_ok=True)
     if not os.path.exists(unet_path):
+        os.makedirs(unet_folder, exist_ok=True)
         gr.Info(f"Downloading base model: {base_model}. Please wait. (You can check the terminal for the download progress)", duration=None)
         print(f"download {base_model}")
         hf_hub_download(repo_id=repo, local_dir=model_folder, filename=model_file)
 
     # download vae
     vae_folder = "models/vae"
-    os.makedirs(vae_folder, exist_ok=True)
     vae_path = os.path.join(vae_folder, "ae.sft")
     if not os.path.exists(vae_path):
+        os.makedirs(vae_folder, exist_ok=True)
         print(f"downloading ae.sft")
         hf_hub_download(repo_id="cocktailpeanut/xulf-dev", local_dir=vae_folder, filename="ae.sft")
 
     # download clip
     clip_folder = "models/clip"
-    os.makedirs(clip_folder, exist_ok=True)
     clip_l_path = os.path.join(clip_folder, "clip_l.safetensors")
     if not os.path.exists(clip_l_path):
+        os.makedirs(clip_folder, exist_ok=True)
         print(f"download clip_l.safetensors")
         hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename=clip_l_path)
 
@@ -564,11 +564,14 @@ def start_training(
     sample_prompts,
 ):
     # write custom script and toml
-    os.makedirs("models", exist_ok=True)
-    os.makedirs("outputs", exist_ok=True)
+    if not os.path.exists("models"):
+        os.makedirs("models", exist_ok=True)
+    if not os.path.exists("outputs"):
+        os.makedirs("outputs", exist_ok=True)
     output_name = slugify(lora_name)
     output_dir = resolve_path_without_quotes(f"outputs/{output_name}")
-    os.makedirs(output_dir, exist_ok=True)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
 
     download(base_model)
 
