@@ -330,7 +330,7 @@ def download(base_model):
         os.makedirs(unet_folder, exist_ok=True)
         gr.Info(f"Downloading base model: {base_model}. Please wait. (You can check the terminal for the download progress)", duration=None)
         print(f"download {base_model}")
-        hf_hub_download(repo_id=repo, local_dir=model_folder, filename=model_file)
+        hf_hub_download(repo_id=repo, local_dir=unet_folder, filename=model_file)
 
     # download vae
     vae_folder = "models/vae"
