@@ -1,3 +1,11 @@
+# Add your own model here
+# <name that will show up on the dropdown>:
+#   repo: <the huggingface repo ID to pull from>
+#   base: <the model used to run inference with (The Huggingface "Inference API" widget will use this to generate demo images)>
+#   license: <follow the other examples. Any model inherited from DEV should use the dev license, schenll is apache-2.0>
+#   license_name: <follow the other examples. only needed for dev inherited models>
+#   license_link: <follow the other examples. only needed for dev inherited models>
+#   file: <the file name within the huggingface repo>
 flux-dev:
     repo: cocktailpeanut/xulf-dev
     base: black-forest-labs/FLUX.1-dev
@@ -12,7 +20,7 @@ flux-schnell:
     file: flux1-schnell.safetensors
 bdsqlsz/flux1-dev2pro-single:
     repo: bdsqlsz/flux1-dev2pro-single
-    base: bdsqlsz/flux1-dev2pro-single
+    base: black-forest-labs/FLUX.1-dev
     license: other
     license_name: flux-1-dev-non-commercial-license
     license_link: https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/LICENSE.md
