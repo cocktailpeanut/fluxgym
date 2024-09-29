@@ -934,7 +934,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                         images = gr.File(
                             file_types=["image", ".txt"],
                             label="Upload your images",
-                            info="If you want, you can also manually upload caption files that match the image names (example: img0.png => img0.txt)",
+                            #info="If you want, you can also manually upload caption files that match the image names (example: img0.png => img0.txt)",
                             file_count="multiple",
                             interactive=True,
                             visible=True,
