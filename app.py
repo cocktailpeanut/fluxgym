@@ -252,8 +252,13 @@ def create_dataset(destination_folder, size, *inputs):
         caption_file_name = os.path.splitext(image_file_name)[0] + ".txt"
         caption_path = resolve_path_without_quotes(os.path.join(destination_folder, caption_file_name))
         print(f"image_path={new_image_path}, caption_path = {caption_path}, original_caption={original_caption}")
-        with open(caption_path, 'w') as file:
-            file.write(original_caption)
+        # if caption_path exists, do not write
+        if os.path.exists(caption_path):
+            print(f"{caption_path} already exists. use the existing .txt file")
+        else:
+            print(f"{caption_path} create a .txt caption file")
+            with open(caption_path, 'w') as file:
+                file.write(original_caption)
 
     print(f"destination_folder {destination_folder}")
     return destination_folder
@@ -929,6 +934,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                         images = gr.File(
                             file_types=["image", ".txt"],
                             label="Upload your images",
+                            info="If you want, you can also manually upload caption files that match the image names (example: img0.png => img0.txt)",
                             file_count="multiple",
                             interactive=True,
                             visible=True,
