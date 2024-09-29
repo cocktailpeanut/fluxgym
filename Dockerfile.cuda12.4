@@ -1,5 +1,5 @@
-# Base image with CUDA 12.2
-FROM nvidia/cuda:12.2.2-base-ubuntu22.04
+# Base image with CUDA 12.4
+FROM nvidia/cuda:12.4.1-base-ubuntu22.04
 
 # Install pip if not already installed
 RUN apt-get update -y && apt-get install -y \
@@ -28,8 +28,8 @@ RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
 COPY ./requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r ./requirements.txt
 
-# Install Torch, Torchvision, and Torchaudio for CUDA 12.2
-RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
+# Install Torch, Torchvision, and Torchaudio for CUDA 12.4
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 RUN chown -R appuser:appuser /app
 
