@@ -248,3 +248,12 @@ The advanced tab is automatically constructed by parsing the launch flags availa
 ![advanced.png](advanced.png)
 
 
+## Advanced Features
+
+### Uploading Caption Files
+
+You can also upload the caption files along with the image files. You just need to follow the convention:
+
+1. Every caption file must be a `.txt` file.
+2. Each caption file needs to have a corresponding image file that has the same name.
+3. For example, if you have an image file named `img0.png`, the corresponding caption file must be `img0.txt`.
