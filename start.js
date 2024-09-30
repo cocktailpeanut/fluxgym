@@ -6,6 +6,7 @@ module.exports = {
       params: {
         venv: "env",                // Edit this to customize the venv folder path
         env: {
+          LOG_LEVEL: "DEBUG",
           CUDA_VISIBLE_DEVICES: "0"
         },                   // Edit this to customize environment variables (see documentation)
         message: [

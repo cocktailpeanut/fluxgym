@@ -57,28 +57,31 @@ def readme(base_model, lora_name, instance_prompt, sample_prompts):
     sample_image_paths = []
     output_name = slugify(lora_name)
     samples_dir = resolve_path_without_quotes(f"outputs/{output_name}/sample")
-    for filename in os.listdir(samples_dir):
-        # Filename Schema: [name]_[steps]_[index]_[timestamp].png
-        match = re.search(r"_(\d+)_(\d+)_(\d+)\.png$", filename)
-        if match:
-            steps, index, timestamp = int(match.group(1)), int(match.group(2)), int(match.group(3))
-            sample_image_paths.append((steps, index, f"sample/{filename}"))
+    try:
+        for filename in os.listdir(samples_dir):
+            # Filename Schema: [name]_[steps]_[index]_[timestamp].png
+            match = re.search(r"_(\d+)_(\d+)_(\d+)\.png$", filename)
+            if match:
+                steps, index, timestamp = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                sample_image_paths.append((steps, index, f"sample/{filename}"))
 
-    # Sort by numeric index
-    sample_image_paths.sort(key=lambda x: x[0], reverse=True)
+        # Sort by numeric index
+        sample_image_paths.sort(key=lambda x: x[0], reverse=True)
 
-    final_sample_image_paths = sample_image_paths[:len(sample_prompts)]
-    final_sample_image_paths.sort(key=lambda x: x[1])
-    for i, prompt in enumerate(sample_prompts):
-        _, _, image_path = final_sample_image_paths[i]
-        widgets.append(
-            {
-                "text": prompt,
-                "output": {
-                    "url": image_path
-                },
-            }
-        )
+        final_sample_image_paths = sample_image_paths[:len(sample_prompts)]
+        final_sample_image_paths.sort(key=lambda x: x[1])
+        for i, prompt in enumerate(sample_prompts):
+            _, _, image_path = final_sample_image_paths[i]
+            widgets.append(
+                {
+                    "text": prompt,
+                    "output": {
+                        "url": image_path
+                    },
+                }
+            )
+    except:
+        print(f"no samples")
     dtype = "torch.bfloat16"
     # Construct the README content
     readme_content = f"""---
@@ -612,6 +615,7 @@ def start_training(
     # Use Popen to run the command and capture output in real-time
     env = os.environ.copy()
     env['PYTHONIOENCODING'] = 'utf-8'
+    env['LOG_LEVEL'] = 'DEBUG'
     runner = LogsViewRunner()
     cwd = os.path.dirname(os.path.abspath(__file__))
     gr.Info(f"Started training")
