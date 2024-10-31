@@ -358,11 +358,11 @@ def download(base_model):
         hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="clip_l.safetensors")
 
     # download t5xxl
-    t5xxl_path = os.path.join(clip_folder, "t5xxl_fp16.safetensors")
+    t5xxl_path = os.path.join(clip_folder, f"{t5xxl}.safetensors")
     if not os.path.exists(t5xxl_path):
-        print(f"download t5xxl_fp16.safetensors")
+        print(f"download {t5xxl}.safetensors")
         gr.Info(f"Downloading t5xxl...")
-        hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="t5xxl_fp16.safetensors")
+        hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename=f"{t5xxl}.safetensors")
 
 
 def resolve_path(p):
@@ -448,7 +448,7 @@ def gen_sh(
     pretrained_model_path = resolve_path(model_path)
 
     clip_path = resolve_path("models/clip/clip_l.safetensors")
-    t5_path = resolve_path("models/clip/t5xxl_fp16.safetensors")
+    t5_path = resolve_path(f"models/clip/{t5xxl}.safetensors")
     ae_path = resolve_path("models/vae/ae.sft")
     sh = f"""accelerate launch {line_break}
   --mixed_precision bf16 {line_break}
@@ -1122,10 +1122,13 @@ if __name__ == "__main__":
     parser.add_argument("--show_error", type=bool, default=True)
     parser.add_argument("--server_name", type=str, default="localhost")
     parser.add_argument("--server_port", type=int, default=7860)
+    parser.add_argument("--t5xxl", type=str, default="t5xxl_fp16")
 
     args = parser.parse_args()
 
     cwd = os.path.dirname(os.path.abspath(__file__))
+
+    t5xxl = args.t5xxl
 
     demo.launch(
         debug=args.debug,
