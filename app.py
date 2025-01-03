@@ -1098,6 +1098,52 @@ async def train_lora_api(
             "traceback": traceback.format_exc()
         }
 
+@app.get("/api/train/status/{lora_name}")
+async def check_training_status(lora_name: str):
+    try:
+        output_name = slugify(lora_name)
+        output_dir = resolve_path_without_quotes(f"outputs/{output_name}")
+        
+        if not os.path.exists(output_dir):
+            return {
+                "status": "not_found",
+                "message": f"No training job found for {lora_name}"
+            }
+        
+        # Get list of files in the output directory
+        files = os.listdir(output_dir)
+        
+        # Look for .safetensors files which indicate training progress
+        model_files = [f for f in files if f.endswith('.safetensors')]
+        
+        # Check for sample images
+        sample_dir = os.path.join(output_dir, "sample")
+        sample_files = []
+        if os.path.exists(sample_dir):
+            sample_files = [f for f in os.listdir(sample_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
+        
+        # Determine status
+        status = "in_progress"
+        if model_files:
+            status = "completed"  # At least one model file exists
+            
+        return {
+            "status": status,
+            "lora_name": lora_name,
+            "output_dir": output_dir,
+            "files": files,
+            "model_files": model_files,
+            "sample_files": sample_files,
+            "last_modified": os.path.getmtime(output_dir) if files else None
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }
+
 with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     with gr.Tabs() as tabs:
         with gr.TabItem("Gym"):
