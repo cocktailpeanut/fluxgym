@@ -50,4 +50,4 @@ ENV GRADIO_SERVER_NAME="0.0.0.0"
 WORKDIR /app/fluxgym
 
 # Run fluxgym Python application
-CMD ["python3", "./app.py"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860", "--reload"]
