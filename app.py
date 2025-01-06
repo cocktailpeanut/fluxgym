@@ -27,8 +27,9 @@ from argparse import Namespace
 import train_network
 import toml
 import re
-MAX_IMAGES = 150
+import glob
 
+MAX_IMAGES = 30
 with open('models.yaml', 'r') as file:
     models = yaml.safe_load(file)
 
@@ -680,6 +681,8 @@ def start_training(
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write(md)
 
+    move_latest_lora_to_sd(output_name)
+    ensure_flux_model_available()
     gr.Info(f"Training Complete. Check the outputs folder for the LoRA files.", duration=None)
 
 
@@ -1012,7 +1015,7 @@ async def train_lora_api(
         # Use default base_model if none provided
         with open('models.yaml', 'r') as file:
             models = yaml.safe_load(file)
-        base_model = list(models.keys())[0]  # Get first model as default
+        base_model = list(models.keys())[1]  # Get first model as default
         print(f"Using base model: {base_model}")
             
         # Create temporary directory
@@ -1143,6 +1146,73 @@ async def check_training_status(lora_name: str):
             "message": str(e),
             "traceback": traceback.format_exc()
         }
+
+def move_latest_lora_to_sd(model_name):
+    try:
+        # Get the output directory path
+        output_dir = os.path.join('outputs', model_name)
+        
+        # Find all safetensors files for this model
+        pattern = os.path.join(output_dir, f'{model_name}-*.safetensors')
+        lora_files = glob.glob(pattern)
+        
+        if not lora_files:
+            gr.Info(f"No LoRA files found in {output_dir}", duration=None)
+            return
+            
+        # Get the latest file based on number in filename
+        latest_file = max(lora_files, key=lambda x: int(x.split('-')[-1].split('.')[0]))
+        
+        # Define SD WebUI LoRA directory
+        sd_path = '/workspace/stable-diffusion-webui/models'
+        lora_path = os.path.join(sd_path, 'Lora')
+        
+        # Check if we're in the Docker environment
+        if not os.path.exists(sd_path):
+            gr.Info("Not running in Docker container with SD WebUI. LoRA file is in outputs folder.", duration=None)
+            return
+            
+        # Create Lora directory if it doesn't exist
+        os.makedirs(lora_path, exist_ok=True)
+        
+        # Copy the file to SD WebUI Lora directory
+        destination = os.path.join(lora_path, os.path.basename(latest_file))
+        shutil.copy2(latest_file, destination)
+        
+        gr.Info(f"Training Complete. Latest LoRA file copied to SD WebUI at: {destination}", duration=None)
+        
+    except Exception as e:
+        gr.Info(f"Error moving LoRA file: {str(e)}", duration=None)
+
+def ensure_flux_model_available():
+    try:
+        # Define paths
+        sd_models_path = '/workspace/stable-diffusion-webui/models/Stable-diffusion'
+        flux_source_path = '/workspace/fluxgym/models/unet/.cache/huggingface/download'
+        flux_model = 'flux1-schnell.safetensors'
+        
+        # Check if we're in Docker environment
+        if not os.path.exists('/workspace/stable-diffusion-webui'):
+            gr.Info("Not running in Docker container with SD WebUI.", duration=None)
+            return
+            
+        # Create SD models directory if it doesn't exist
+        os.makedirs(sd_models_path, exist_ok=True)
+        
+        # Check if FLUX model exists in SD
+        sd_flux_path = os.path.join(sd_models_path, flux_model)
+        if not os.path.exists(sd_flux_path):
+            # Check if we have it in FluxGym cache
+            flux_source_file = os.path.join(flux_source_path, flux_model)
+            if os.path.exists(flux_source_file):
+                # Copy the model to SD
+                shutil.copy2(flux_source_file, sd_flux_path)
+                gr.Info(f"Copied FLUX Schnell model to Stable Diffusion models directory", duration=None)
+            else:
+                gr.Info("FLUX Schnell model not found in FluxGym cache directory", duration=None)
+                
+    except Exception as e:
+        gr.Info(f"Error ensuring FLUX Schnell model availability: {str(e)}", duration=None)
 
 with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     with gr.Tabs() as tabs:
