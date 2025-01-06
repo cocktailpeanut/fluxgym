@@ -21,7 +21,7 @@ import traceback
 from slugify import slugify
 from transformers import AutoProcessor, AutoModelForCausalLM
 from gradio_logsview import LogsView, LogsViewRunner
-from huggingface_hub import hf_hub_download, HfApi
+from huggingface_hub import hf_hub_download, HfApi, login, create_repo, upload_file
 from library import flux_train_utils, huggingface_util
 from argparse import Namespace
 import train_network
@@ -681,8 +681,7 @@ def start_training(
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write(md)
 
-    move_latest_lora_to_sd(output_name)
-    ensure_flux_model_available()
+    upload_latest_lora_to_hf(output_name)
     gr.Info(f"Training Complete. Check the outputs folder for the LoRA files.", duration=None)
 
 
@@ -1147,72 +1146,9 @@ async def check_training_status(lora_name: str):
             "traceback": traceback.format_exc()
         }
 
-def move_latest_lora_to_sd(model_name):
-    try:
-        # Get the output directory path
-        output_dir = os.path.join('outputs', model_name)
-        
-        # Find all safetensors files for this model
-        pattern = os.path.join(output_dir, f'{model_name}-*.safetensors')
-        lora_files = glob.glob(pattern)
-        
-        if not lora_files:
-            gr.Info(f"No LoRA files found in {output_dir}", duration=None)
-            return
-            
-        # Get the latest file based on number in filename
-        latest_file = max(lora_files, key=lambda x: int(x.split('-')[-1].split('.')[0]))
-        
-        # Define SD WebUI LoRA directory
-        sd_path = '/workspace/stable-diffusion-webui/models'
-        lora_path = os.path.join(sd_path, 'Lora')
-        
-        # Check if we're in the Docker environment
-        if not os.path.exists(sd_path):
-            gr.Info("Not running in Docker container with SD WebUI. LoRA file is in outputs folder.", duration=None)
-            return
-            
-        # Create Lora directory if it doesn't exist
-        os.makedirs(lora_path, exist_ok=True)
-        
-        # Copy the file to SD WebUI Lora directory
-        destination = os.path.join(lora_path, os.path.basename(latest_file))
-        shutil.copy2(latest_file, destination)
-        
-        gr.Info(f"Training Complete. Latest LoRA file copied to SD WebUI at: {destination}", duration=None)
-        
-    except Exception as e:
-        gr.Info(f"Error moving LoRA file: {str(e)}", duration=None)
 
-def ensure_flux_model_available():
-    try:
-        # Define paths
-        sd_models_path = '/workspace/stable-diffusion-webui/models/Stable-diffusion'
-        flux_source_path = '/workspace/fluxgym/models/unet/.cache/huggingface/download'
-        flux_model = 'flux1-schnell.safetensors'
-        
-        # Check if we're in Docker environment
-        if not os.path.exists('/workspace/stable-diffusion-webui'):
-            gr.Info("Not running in Docker container with SD WebUI.", duration=None)
-            return
-            
-        # Create SD models directory if it doesn't exist
-        os.makedirs(sd_models_path, exist_ok=True)
-        
-        # Check if FLUX model exists in SD
-        sd_flux_path = os.path.join(sd_models_path, flux_model)
-        if not os.path.exists(sd_flux_path):
-            # Check if we have it in FluxGym cache
-            flux_source_file = os.path.join(flux_source_path, flux_model)
-            if os.path.exists(flux_source_file):
-                # Copy the model to SD
-                shutil.copy2(flux_source_file, sd_flux_path)
-                gr.Info(f"Copied FLUX Schnell model to Stable Diffusion models directory", duration=None)
-            else:
-                gr.Info("FLUX Schnell model not found in FluxGym cache directory", duration=None)
-                
-    except Exception as e:
-        gr.Info(f"Error ensuring FLUX Schnell model availability: {str(e)}", duration=None)
+
+
 
 with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     with gr.Tabs() as tabs:
@@ -1450,3 +1386,48 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=7860
     )
+
+def upload_latest_lora_to_hf(model_name):
+    try:
+        # Get the output directory path
+        output_dir = os.path.join('outputs', model_name)
+        
+        # Find all safetensors files for this model
+        pattern = os.path.join(output_dir, f'{model_name}-*.safetensors')
+        lora_files = glob.glob(pattern)
+        
+        if not lora_files:
+            gr.Info(f"No LoRA files found in {output_dir}", duration=None)
+            return
+            
+        # Get the latest file based on number in filename
+        latest_file = max(lora_files, key=lambda x: int(x.split('-')[-1].split('.')[0]))
+        
+        # Login to Hugging Face
+        login("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")
+        
+        repo_name = f"inversense/{model_name}_lora"
+        
+        try:
+            # Create the repository (will fail if it exists, that's ok)
+            create_repo(
+                repo_id=repo_name,
+                repo_type="model",
+                private=False
+            )
+        except Exception as repo_error:
+            # Ignore repo already exists error
+            pass
+            
+        # Upload the file
+        upload_file(
+            path_or_fileobj=latest_file,
+            path_in_repo=os.path.basename(latest_file),
+            repo_id=repo_name,
+            repo_type="model"
+        )
+        
+        gr.Info(f"Training Complete. Latest LoRA file uploaded to Hugging Face: {repo_name}", duration=None)
+        
+    except Exception as e:
+        gr.Info(f"Error uploading LoRA to Hugging Face: {str(e)}", duration=None)
