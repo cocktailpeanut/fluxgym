@@ -1014,7 +1014,7 @@ async def train_lora_api(
         # Use default base_model if none provided
         with open('models.yaml', 'r') as file:
             models = yaml.safe_load(file)
-        base_model = list(models.keys())[1]  # Get first model as default
+        base_model = list(models.keys())[0]  # Get first model as default
         print(f"Using base model: {base_model}")
             
         # Create temporary directory
