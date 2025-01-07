@@ -1146,9 +1146,13 @@ async def check_training_status(lora_name: str):
             "traceback": traceback.format_exc()
         }
 
-
-
-
+@app.get("/test-upload/{model_name}")
+async def test_upload(model_name: str):
+    try:
+        upload_latest_lora_to_hf(model_name)
+        return {"status": "success", "message": f"Attempted to upload latest LoRA for model {model_name}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     with gr.Tabs() as tabs:
