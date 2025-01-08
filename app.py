@@ -620,6 +620,7 @@ def start_training(
         
     output_name = slugify(lora_name)
     output_dir = resolve_path_without_quotes(f"outputs/{output_name}")
+   
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
         print(f"Created output directory: {output_dir}")
@@ -681,8 +682,8 @@ def start_training(
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write(md)
 
+    print(f"Training Complete. Uploading to Hugging Face...")
     upload_latest_lora_to_hf(output_name)
-    gr.Info(f"Training Complete. Check the outputs folder for the LoRA files.", duration=None)
 
 
 def update(
