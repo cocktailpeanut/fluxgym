@@ -1,5 +1,10 @@
 import os
+import time
+import datetime
 import sys
+from fastapi import FastAPI, Form, File, UploadFile
+from typing import List
+import tempfile
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 os.environ['GRADIO_ANALYTICS_ENABLED'] = '0'
 sys.path.insert(0, os.getcwd())
@@ -12,19 +17,47 @@ import uuid
 import shutil
 import json
 import yaml
+import traceback
 from slugify import slugify
 from transformers import AutoProcessor, AutoModelForCausalLM
 from gradio_logsview import LogsView, LogsViewRunner
-from huggingface_hub import hf_hub_download, HfApi
+from huggingface_hub import hf_hub_download, HfApi, login, create_repo, upload_file
 from library import flux_train_utils, huggingface_util
 from argparse import Namespace
 import train_network
 import toml
 import re
-MAX_IMAGES = 150
+import glob
 
+MAX_IMAGES = 30
 with open('models.yaml', 'r') as file:
     models = yaml.safe_load(file)
+
+def relaunch_process(launch_counter=0):
+    while True:
+        print('Relauncher: Launching...')
+        if launch_counter > 0:
+            print(f'\tRelaunch count: {launch_counter}')
+
+def process_uploaded_files(images_files, captions_files, temp_dir):
+    """Helper function to process uploaded files and return paths"""
+    image_paths = []
+    caption_paths = []
+    
+    # Save uploaded files
+    for img in images_files:
+        img_path = os.path.join(temp_dir, img.filename)
+        with open(img_path, "wb") as buffer:
+            shutil.copyfileobj(img.file, buffer)
+        image_paths.append(img_path)
+        
+    for caption in captions_files:
+        caption_path = os.path.join(temp_dir, caption.filename)
+        with open(caption_path, "wb") as buffer:
+            shutil.copyfileobj(caption.file, buffer)
+        caption_paths.append(caption_path)
+        
+    return image_paths, caption_paths
 
 def readme(base_model, lora_name, instance_prompt, sample_prompts):
 
@@ -573,38 +606,48 @@ def start_training(
     train_config,
     sample_prompts,
 ):
+    print(f"\n=== Training Configuration ===")
+    print(f"Base Model: {base_model}")
+    print(f"LoRA Name: {lora_name}")
+    
     # write custom script and toml
     if not os.path.exists("models"):
         os.makedirs("models", exist_ok=True)
+        print("Created models directory")
     if not os.path.exists("outputs"):
         os.makedirs("outputs", exist_ok=True)
+        print("Created outputs directory")
+        
     output_name = slugify(lora_name)
     output_dir = resolve_path_without_quotes(f"outputs/{output_name}")
+   
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
+        print(f"Created output directory: {output_dir}")
 
+    print(f"\n=== Downloading Model Files ===")
     download(base_model)
 
     file_type = "sh"
     if sys.platform == "win32":
         file_type = "bat"
 
+    print(f"\n=== Writing Training Files ===")
     sh_filename = f"train.{file_type}"
     sh_filepath = resolve_path_without_quotes(f"outputs/{output_name}/{sh_filename}")
     with open(sh_filepath, 'w', encoding="utf-8") as file:
         file.write(train_script)
-    gr.Info(f"Generated train script at {sh_filename}")
-
+    print(f"Generated train script at: {sh_filepath}")
 
     dataset_path = resolve_path_without_quotes(f"outputs/{output_name}/dataset.toml")
     with open(dataset_path, 'w', encoding="utf-8") as file:
         file.write(train_config)
-    gr.Info(f"Generated dataset.toml")
+    print(f"Generated dataset config at: {dataset_path}")
 
     sample_prompts_path = resolve_path_without_quotes(f"outputs/{output_name}/sample_prompts.txt")
     with open(sample_prompts_path, 'w', encoding='utf-8') as file:
         file.write(sample_prompts)
-    gr.Info(f"Generated sample_prompts.txt")
+    print(f"Generated sample prompts at: {sample_prompts_path}")
 
     # Train
     if sys.platform == "win32":
@@ -612,13 +655,16 @@ def start_training(
     else:
         command = f"bash \"{sh_filepath}\""
 
+    print(f"\n=== Executing Training Command ===")
+    print(f"Command: {command}")
+    
     # Use Popen to run the command and capture output in real-time
     env = os.environ.copy()
     env['PYTHONIOENCODING'] = 'utf-8'
     env['LOG_LEVEL'] = 'DEBUG'
     runner = LogsViewRunner()
     cwd = os.path.dirname(os.path.abspath(__file__))
-    gr.Info(f"Started training")
+    print(f"Working directory: {cwd}")
     yield from runner.run_command([command], cwd=cwd)
     yield runner.log(f"Runner: {runner}")
 
@@ -636,7 +682,8 @@ def start_training(
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write(md)
 
-    gr.Info(f"Training Complete. Check the outputs folder for the LoRA files.", duration=None)
+    print(f"Training Complete. Uploading to Hugging Face...")
+    upload_latest_lora_to_hf(output_name)
 
 
 def update(
@@ -684,6 +731,58 @@ def update(
         num_repeats
     )
     return gr.update(value=sh), gr.update(value=toml), dataset_folder
+
+def generate_training_files(
+    base_model,
+    lora_name,
+    resolution,
+    seed,
+    workers,
+    class_tokens,
+    learning_rate,
+    network_dim,
+    max_train_epochs,
+    save_every_n_epochs,
+    timestep_sampling,
+    guidance_scale,
+    vram,
+    num_repeats,
+    sample_prompts,
+    sample_every_n_steps,
+    *advanced_components,
+):
+    output_name = slugify(lora_name)
+    dataset_folder = str(f"datasets/{output_name}")
+    
+    # Generate the shell script
+    sh = gen_sh(
+        base_model,
+        output_name,
+        resolution,
+        seed,
+        workers,
+        learning_rate,
+        network_dim,
+        max_train_epochs,
+        save_every_n_epochs,
+        timestep_sampling,
+        guidance_scale,
+        vram,
+        sample_prompts,
+        sample_every_n_steps,
+        *advanced_components,
+    )
+    
+    # Generate the TOML config
+    toml = gen_toml(
+        dataset_folder,
+        resolution,
+        class_tokens,
+        num_repeats
+    )
+    
+    return sh, toml, dataset_folder
+
 
 """
 demo.load(fn=loaded, js=js, outputs=[hf_token, hf_login, hf_logout, hf_account])
@@ -889,6 +988,172 @@ function() {
 
 current_account = account_hf()
 print(f"current_account={current_account}")
+
+app = FastAPI()
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy"
+      
+    }
+
+@app.post("/api/train")
+async def train_lora_api(
+    lora_name: str = Form(...),
+    trigger_word: str = Form(...),
+    images: List[UploadFile] = File(...),
+    captions: List[UploadFile] = File(None),  # Optional captions
+):
+    try:
+        print(f"\n=== Starting new training job ===")
+        print(f"LoRA Name: {lora_name}")
+        print(f"Trigger Word: {trigger_word}")
+        print(f"Number of images uploaded: {len(images)}")
+        print(f"Number of captions uploaded: {len(captions) if captions else 0}")
+        
+        # Use default base_model if none provided
+        with open('models.yaml', 'r') as file:
+            models = yaml.safe_load(file)
+        base_model = list(models.keys())[0]  # Get first model as default
+        print(f"Using base model: {base_model}")
+            
+        # Create temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            print(f"Created temporary directory: {temp_dir}")
+            
+            # Process uploaded files
+            image_paths, caption_paths = process_uploaded_files(images, captions or [], temp_dir)
+            print(f"Processed {len(image_paths)} images and {len(caption_paths)} captions")
+            
+            # Create dataset folder
+            output_name = slugify(lora_name)
+            dataset_folder = resolve_path_without_quotes(f"datasets/{output_name}")
+            os.makedirs(dataset_folder, exist_ok=True)
+            print(f"Created dataset folder: {dataset_folder}")
+            
+            # Create dataset using existing function
+            print("Creating dataset...")
+            create_dataset(
+                dataset_folder,     
+                512,                
+                image_paths,        
+                *([trigger_word] * len(image_paths))  
+            )
+            print("Dataset creation complete")
+            
+            # Generate training script and config
+            print("Generating training script and config...")
+            train_script, train_config, dataset_folder = generate_training_files(
+                base_model=base_model,
+                lora_name=lora_name,
+                resolution=512,
+                seed=42,
+                workers=2,
+                class_tokens=trigger_word,
+                learning_rate="8e-4",
+                network_dim=4,
+                max_train_epochs=16,
+                save_every_n_epochs=4,
+                timestep_sampling="shift",
+                guidance_scale=1.0,
+                vram="20G",
+                num_repeats=10,
+                sample_prompts="",
+                sample_every_n_steps=0,
+            )
+            print("Generated training script and config")
+
+            # Start training
+            print("\n=== Starting training process ===")
+            try:
+                # Iterate through the generator
+                for training_output in start_training(
+                    base_model=base_model,
+                    lora_name=lora_name,
+                    train_script=train_script,
+                    train_config=train_config,
+                    sample_prompts="",
+                ):
+                    print(f"Training output: {training_output}")
+                print("Training process completed")
+            except Exception as e:
+                print(f"Error during training: {str(e)}")
+                raise e
+
+            return {
+                "status": "success",
+                "message": "Training started",
+                "lora_name": lora_name,
+                "output_name": output_name,
+                "base_model": base_model,
+                "num_images": len(images),
+                "dataset_folder": dataset_folder
+            }
+            
+    except Exception as e:
+        print(f"\n=== Error in training process ===")
+        print(f"Error: {str(e)}")
+        print(traceback.format_exc())
+        return {
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+@app.get("/api/train/status/{lora_name}")
+async def check_training_status(lora_name: str):
+    try:
+        output_name = slugify(lora_name)
+        output_dir = resolve_path_without_quotes(f"outputs/{output_name}")
+        
+        if not os.path.exists(output_dir):
+            return {
+                "status": "not_found",
+                "message": f"No training job found for {lora_name}"
+            }
+        
+        # Get list of files in the output directory
+        files = os.listdir(output_dir)
+        
+        # Look for .safetensors files which indicate training progress
+        model_files = [f for f in files if f.endswith('.safetensors')]
+        
+        # Check for sample images
+        sample_dir = os.path.join(output_dir, "sample")
+        sample_files = []
+        if os.path.exists(sample_dir):
+            sample_files = [f for f in os.listdir(sample_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
+        
+        # Determine status
+        status = "in_progress"
+        if model_files:
+            status = "completed"  # At least one model file exists
+            
+        return {
+            "status": status,
+            "lora_name": lora_name,
+            "output_dir": output_dir,
+            "files": files,
+            "model_files": model_files,
+            "sample_files": sample_files,
+            "last_modified": os.path.getmtime(output_dir) if files else None
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+@app.get("/test-upload/{model_name}")
+async def test_upload(model_name: str):
+    try:
+        upload_latest_lora_to_hf(model_name)
+        return {"status": "success", "message": f"Attempted to upload latest LoRA for model {model_name}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     with gr.Tabs() as tabs:
@@ -1114,6 +1379,60 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     do_captioning.click(fn=run_captioning, inputs=[images, concept_sentence] + caption_list, outputs=caption_list)
     demo.load(fn=loaded, js=js, outputs=[hf_token, hf_login, hf_logout, repo_owner])
     refresh.click(update, inputs=listeners, outputs=[train_script, train_config, dataset_folder])
+
+app = gr.mount_gradio_app(app, demo, path="/")
+
 if __name__ == "__main__":
     cwd = os.path.dirname(os.path.abspath(__file__))
-    demo.launch(debug=True, show_error=True, allowed_paths=[cwd])
+    demo.launch(
+        debug=True, 
+        show_error=True, 
+        allowed_paths=[cwd], 
+        server_name="0.0.0.0",
+        server_port=7860
+    )
+
+def upload_latest_lora_to_hf(model_name):
+    try:
+        # Get the output directory path
+        output_dir = os.path.join('outputs', model_name)
+        
+        # Find all safetensors files for this model
+        pattern = os.path.join(output_dir, f'{model_name}-*.safetensors')
+        lora_files = glob.glob(pattern)
+        
+        if not lora_files:
+            gr.Info(f"No LoRA files found in {output_dir}", duration=None)
+            return
+            
+        # Get the latest file based on number in filename
+        latest_file = max(lora_files, key=lambda x: int(x.split('-')[-1].split('.')[0]))
+        
+        # Login to Hugging Face
+        login("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")
+        
+        repo_name = f"inversense/{model_name}_lora"
+        
+        try:
+            # Create the repository (will fail if it exists, that's ok)
+            create_repo(
+                repo_id=repo_name,
+                repo_type="model",
+                private=False
+            )
+        except Exception as repo_error:
+            # Ignore repo already exists error
+            pass
+            
+        # Upload the file
+        upload_file(
+            path_or_fileobj=latest_file,
+            path_in_repo=os.path.basename(latest_file),
+            repo_id=repo_name,
+            repo_type="model"
+        )
+        
+        gr.Info(f"Training Complete. Latest LoRA file uploaded to Hugging Face: {repo_name}", duration=None)
+        
+    except Exception as e:
+        gr.Info(f"Error uploading LoRA to Hugging Face: {str(e)}", duration=None)

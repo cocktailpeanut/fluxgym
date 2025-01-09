@@ -32,3 +32,4 @@ peft
 gradio
 python-slugify
 imagesize
+huggingface_hub
