@@ -1,6 +1,6 @@
 const path = require('path')
 module.exports = {
-  version: "2.1",
+  version: "3.2",
   title: "fluxgym",
   description: "[NVIDIA Only] Dead simple web UI for training FLUX LoRA with LOW VRAM support (From 12GB)",
   icon: "icon.png",
