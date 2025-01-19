@@ -16,7 +16,7 @@ module.exports = {
       path: "sd-scripts",
       venv: "../env",
       message: [
-        "pip install -r requirements.txt",
+        "uv pip install -r requirements.txt",
       ]
     }
   }, {
@@ -25,7 +25,7 @@ module.exports = {
       venv: "env",
       message: [
         "pip uninstall -y diffusers[torch] torch torchaudio torchvision",
-        "pip install -r requirements.txt",
+        "uv pip install -r requirements.txt",
       ]
     }
   }, {

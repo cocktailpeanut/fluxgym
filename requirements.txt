@@ -32,3 +32,4 @@ peft
 gradio
 python-slugify
 imagesize
+pydantic==2.9.2
