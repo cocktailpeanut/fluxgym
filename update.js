@@ -11,6 +11,11 @@ module.exports = {
       message: "git pull"
     }
   }, {
+    method: "fs.rm",
+    params: {
+      path: "env"
+    }
+  }, {
     method: "shell.run",
     params: {
       path: "sd-scripts",
