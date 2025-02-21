@@ -83,7 +83,7 @@ module.exports = {
           href: "reset.js",
         }]
       }
-    } else {
+    } else if (!running.update) {
       return [{
         default: true,
         icon: "fa-solid fa-plug",
