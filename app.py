@@ -1,7 +1,7 @@
 import os
 import sys
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
-os.environ['GRADIO_ANALYTICS_ENABLED'] = '0'
+# os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+# os.environ['GRADIO_ANALYTICS_ENABLED'] = '0'
 sys.path.insert(0, os.getcwd())
 sys.path.append(os.path.join(os.path.dirname(__file__), 'sd-scripts'))
 import subprocess
@@ -21,6 +21,17 @@ from argparse import Namespace
 import train_network
 import toml
 import re
+
+# 通过环境变量设置目录路径
+OUTPUTS_DIR = os.getenv('OUTPUTS_DIR', 'outputs')
+DATASETS_DIR = os.getenv('DATASETS_DIR', 'datasets')
+MODELS_DIR = os.getenv('MODELS_DIR', 'models')
+
+# 通过环境变量设置文件路径
+CLIP_L_PATH = os.getenv('CLIP_L_PATH', os.path.join(MODELS_DIR, 'clip', 'clip_l.safetensors'))
+T5XXL_PATH = os.getenv('T5XXL_PATH', os.path.join(MODELS_DIR, 'clip', 't5xxl_fp16.safetensors'))
+VAE_PATH = os.getenv('VAE_PATH', os.path.join(MODELS_DIR, 'vae', 'ae.sft'))
+
 MAX_IMAGES = 150
 
 with open('models.yaml', 'r') as file:
@@ -56,7 +67,7 @@ def readme(base_model, lora_name, instance_prompt, sample_prompts):
     widgets = []
     sample_image_paths = []
     output_name = slugify(lora_name)
-    samples_dir = resolve_path_without_quotes(f"outputs/{output_name}/sample")
+    samples_dir = resolve_path_without_quotes(f"{OUTPUTS_DIR}/{output_name}/sample")
     try:
         for filename in os.listdir(samples_dir):
             # Filename Schema: [name]_[steps]_[index]_[timestamp].png
@@ -329,9 +340,9 @@ def download(base_model):
 
     # download unet
     if base_model == "flux-dev" or base_model == "flux-schnell":
-        unet_folder = "models/unet"
+        unet_folder = f"{MODELS_DIR}/unet"
     else:
-        unet_folder = f"models/unet/{repo}"
+        unet_folder = f"{MODELS_DIR}/unet/{repo}"
     unet_path = os.path.join(unet_folder, model_file)
     if not os.path.exists(unet_path):
         os.makedirs(unet_folder, exist_ok=True)
@@ -340,8 +351,8 @@ def download(base_model):
         hf_hub_download(repo_id=repo, local_dir=unet_folder, filename=model_file)
 
     # download vae
-    vae_folder = "models/vae"
-    vae_path = os.path.join(vae_folder, "ae.sft")
+    vae_folder = f"{MODELS_DIR}/vae"
+    vae_path = VAE_PATH
     if not os.path.exists(vae_path):
         os.makedirs(vae_folder, exist_ok=True)
         gr.Info(f"Downloading vae")
@@ -349,8 +360,8 @@ def download(base_model):
         hf_hub_download(repo_id="cocktailpeanut/xulf-dev", local_dir=vae_folder, filename="ae.sft")
 
     # download clip
-    clip_folder = "models/clip"
-    clip_l_path = os.path.join(clip_folder, "clip_l.safetensors")
+    clip_folder = f"{MODELS_DIR}/clip"
+    clip_l_path = CLIP_L_PATH
     if not os.path.exists(clip_l_path):
         os.makedirs(clip_folder, exist_ok=True)
         gr.Info(f"Downloading clip...")
@@ -358,7 +369,7 @@ def download(base_model):
         hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="clip_l.safetensors")
 
     # download t5xxl
-    t5xxl_path = os.path.join(clip_folder, "t5xxl_fp16.safetensors")
+    t5xxl_path = T5XXL_PATH
     if not os.path.exists(t5xxl_path):
         print(f"download t5xxl_fp16.safetensors")
         gr.Info(f"Downloading t5xxl...")
@@ -394,8 +405,8 @@ def gen_sh(
 
     print(f"gen_sh: network_dim:{network_dim}, max_train_epochs={max_train_epochs}, save_every_n_epochs={save_every_n_epochs}, timestep_sampling={timestep_sampling}, guidance_scale={guidance_scale}, vram={vram}, sample_prompts={sample_prompts}, sample_every_n_steps={sample_every_n_steps}")
 
-    output_dir = resolve_path(f"outputs/{output_name}")
-    sample_prompts_path = resolve_path(f"outputs/{output_name}/sample_prompts.txt")
+    output_dir = resolve_path(f"{OUTPUTS_DIR}/{output_name}")
+    sample_prompts_path = resolve_path(f"{OUTPUTS_DIR}/{output_name}/sample_prompts.txt")
 
     line_break = "\\"
     file_type = "sh"
@@ -441,15 +452,15 @@ def gen_sh(
     model_file = model_config["file"]
     repo = model_config["repo"]
     if base_model == "flux-dev" or base_model == "flux-schnell":
-        model_folder = "models/unet"
+        model_folder = f"{MODELS_DIR}/unet"
     else:
-        model_folder = f"models/unet/{repo}"
+        model_folder = f"{MODELS_DIR}/unet/{repo}"
     model_path = os.path.join(model_folder, model_file)
     pretrained_model_path = resolve_path(model_path)
 
-    clip_path = resolve_path("models/clip/clip_l.safetensors")
-    t5_path = resolve_path("models/clip/t5xxl_fp16.safetensors")
-    ae_path = resolve_path("models/vae/ae.sft")
+    clip_path = resolve_path(CLIP_L_PATH)
+    t5_path = resolve_path(T5XXL_PATH)
+    ae_path = resolve_path(VAE_PATH)
     sh = f"""accelerate launch {line_break}
   --mixed_precision bf16 {line_break}
   --num_cpu_threads_per_process 1 {line_break}
@@ -476,7 +487,7 @@ def gen_sh(
   --highvram {line_break}
   --max_train_epochs {max_train_epochs} {line_break}
   --save_every_n_epochs {save_every_n_epochs} {line_break}
-  --dataset_config {resolve_path(f"outputs/{output_name}/dataset.toml")} {line_break}
+  --dataset_config {resolve_path(f"{OUTPUTS_DIR}/{output_name}/dataset.toml")} {line_break}
   --output_dir {output_dir} {line_break}
   --output_name {output_name} {line_break}
   --timestep_sampling {timestep_sampling} {line_break}
@@ -548,7 +559,7 @@ def set_repo(lora_rows):
 
 def get_loras():
     try:
-        outputs_path = resolve_path_without_quotes(f"outputs")
+        outputs_path = resolve_path_without_quotes(f"{OUTPUTS_DIR}")
         files = os.listdir(outputs_path)
         folders = [os.path.join(outputs_path, item) for item in files if os.path.isdir(os.path.join(outputs_path, item)) and item != "sample"]
         folders.sort(key=lambda file: os.path.getctime(file), reverse=True)
@@ -559,7 +570,7 @@ def get_loras():
 def get_samples(lora_name):
     output_name = slugify(lora_name)
     try:
-        samples_path = resolve_path_without_quotes(f"outputs/{output_name}/sample")
+        samples_path = resolve_path_without_quotes(f"{OUTPUTS_DIR}/{output_name}/sample")
         files = [os.path.join(samples_path, file) for file in os.listdir(samples_path)]
         files.sort(key=lambda file: os.path.getctime(file), reverse=True)
         return files
@@ -574,12 +585,12 @@ def start_training(
     sample_prompts,
 ):
     # write custom script and toml
-    if not os.path.exists("models"):
-        os.makedirs("models", exist_ok=True)
-    if not os.path.exists("outputs"):
-        os.makedirs("outputs", exist_ok=True)
+    if not os.path.exists(MODELS_DIR):
+        os.makedirs(MODELS_DIR, exist_ok=True)
+    if not os.path.exists(OUTPUTS_DIR):
+        os.makedirs(OUTPUTS_DIR, exist_ok=True)
     output_name = slugify(lora_name)
-    output_dir = resolve_path_without_quotes(f"outputs/{output_name}")
+    output_dir = resolve_path_without_quotes(f"{OUTPUTS_DIR}/{output_name}")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
@@ -590,18 +601,18 @@ def start_training(
         file_type = "bat"
 
     sh_filename = f"train.{file_type}"
-    sh_filepath = resolve_path_without_quotes(f"outputs/{output_name}/{sh_filename}")
+    sh_filepath = resolve_path_without_quotes(f"{OUTPUTS_DIR}/{output_name}/{sh_filename}")
     with open(sh_filepath, 'w', encoding="utf-8") as file:
         file.write(train_script)
     gr.Info(f"Generated train script at {sh_filename}")
 
 
-    dataset_path = resolve_path_without_quotes(f"outputs/{output_name}/dataset.toml")
+    dataset_path = resolve_path_without_quotes(f"{OUTPUTS_DIR}/{output_name}/dataset.toml")
     with open(dataset_path, 'w', encoding="utf-8") as file:
         file.write(train_config)
     gr.Info(f"Generated dataset.toml")
 
-    sample_prompts_path = resolve_path_without_quotes(f"outputs/{output_name}/sample_prompts.txt")
+    sample_prompts_path = resolve_path_without_quotes(f"{OUTPUTS_DIR}/{output_name}/sample_prompts.txt")
     with open(sample_prompts_path, 'w', encoding='utf-8') as file:
         file.write(sample_prompts)
     gr.Info(f"Generated sample_prompts.txt")
@@ -627,12 +638,12 @@ def start_training(
     concept_sentence = config['datasets'][0]['subsets'][0]['class_tokens']
     print(f"concept_sentence={concept_sentence}")
     print(f"lora_name {lora_name}, concept_sentence={concept_sentence}, output_name={output_name}")
-    sample_prompts_path = resolve_path_without_quotes(f"outputs/{output_name}/sample_prompts.txt")
+    sample_prompts_path = resolve_path_without_quotes(f"{OUTPUTS_DIR}/{output_name}/sample_prompts.txt")
     with open(sample_prompts_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
     sample_prompts = [line.strip() for line in lines if len(line.strip()) > 0 and line[0] != "#"]
     md = readme(base_model, lora_name, concept_sentence, sample_prompts)
-    readme_path = resolve_path_without_quotes(f"outputs/{output_name}/README.md")
+    readme_path = resolve_path_without_quotes(f"{OUTPUTS_DIR}/{output_name}/README.md")
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write(md)
 
@@ -659,7 +670,7 @@ def update(
     *advanced_components,
 ):
     output_name = slugify(lora_name)
-    dataset_folder = str(f"datasets/{output_name}")
+    dataset_folder = str(f"{DATASETS_DIR}/{output_name}")
     sh = gen_sh(
         base_model,
         output_name,

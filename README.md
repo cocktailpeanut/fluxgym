@@ -129,6 +129,46 @@ pip install --pre torch torchvision torchaudio --index-url https://download.pyto
 
 # Start
 
+## 1. Start via `app-launch.sh`
+
+For Linux users, you can use the `app-launch.sh` script to start the app.
+
+```
+sh app-launch.sh
+# or give execute permission and run
+# chmod +x app-launch.sh
+./app-launch.sh
+```
+Also, you can modify the `app-launch.sh` script to set the environment variables as you want.
+
+```
+# multi-thread download
+export HF_HUB_ENABLE_HF_TRANSFER="1"
+
+# disable analytics
+export GRADIO_ANALYTICS_ENABLED="0"
+
+# HuggingFace cache directory
+#export HF_HOME="/path/to/your/custom/cache"
+
+# For HuggingFace mirror site to accelerate download for China users
+export HF_ENDPOINT="https://hf-mirror.com"
+
+# Set directory path by environment variables
+export OUTPUTS_DIR="/root/autodl-tmp/fluxgym/outputs"
+export DATASETS_DIR="/root/autodl-tmp/fluxgym/datasets"
+export MODELS_DIR="/root/autodl-tmp/fluxgym/models"
+
+# Set file path by environment variables
+export CLIP_L_PATH="/root/autodl-tmp/fluxgym/models/clip/clip_l.safetensors"
+export T5XXL_PATH="/root/autodl-tmp/fluxgym/models/clip/t5xxl_fp16.safetensors"
+export VAE_PATH="/root/autodl-tmp/fluxgym/models/vae/ae.sft"
+```
+
+> China users can try my [AutoDL](https://www.autodl.com/) mirror [Fluxgym_Starter](https://www.codewithgpu.com/i/tj-scripts/fluxgym/Fluxgym_Starter).
+
+## 2. Start via `python app.py`
+
 Go back to the root `fluxgym` folder, with the venv activated, run:
 
 ```
