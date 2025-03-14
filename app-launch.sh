@@ -13,14 +13,20 @@ done
 
 echo "`which python`:  `python --version`"
 
+# disable multi-thread download
+export HF_HUB_ENABLE_HF_TRANSFER="0"
+# disable analytics
+export GRADIO_ANALYTICS_ENABLED="0"
+# For HuggingFace mirror site to accelerate download for China users
+export HF_ENDPOINT="https://hf-mirror.com"
+# HuggingFace cache directory
+#export HF_HOME="/path/to/your/custom/cache"
+
 # Unified base directory configuration
 base_dir="/root/autodl-tmp/fluxgym"
 export OUTPUTS_DIR="$base_dir/outputs"
 export DATASETS_DIR="$base_dir/datasets"
 export MODELS_DIR="$base_dir/models"
-
-# HuggingFace cache directory
-#export HF_HOME="/path/to/your/custom/cache"
 
 # Model paths using base directory
 export CLIP_L_PATH="$base_dir/models/clip/clip_l.safetensors"

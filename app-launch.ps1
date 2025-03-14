@@ -13,11 +13,12 @@ foreach ($dir in $venvDirs) {
     }
 }
 
-# Set environment variables
-$env:HF_HUB_ENABLE_HF_TRANSFER = "1"
+# disable multi-thread download
+$env:HF_HUB_ENABLE_HF_TRANSFER = "0"
+# disable analytics
 $env:GRADIO_ANALYTICS_ENABLED = "0"
+# For HuggingFace mirror site to accelerate download for China users
 $env:HF_ENDPOINT = "https://hf-mirror.com"
-
 # HuggingFace cache directory
 # $env:HF_HOME = "D:\Documents\fluxgym\cache"
 
