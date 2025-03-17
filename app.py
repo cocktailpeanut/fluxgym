@@ -17,7 +17,7 @@ from transformers import AutoProcessor, AutoModelForCausalLM
 from gradio_logsview import LogsView, LogsViewRunner
 from huggingface_hub import hf_hub_download, HfApi
 from library import flux_train_utils, huggingface_util
-from argparse import Namespace
+import argparse
 import train_network
 import toml
 import re
@@ -158,7 +158,7 @@ def upload_hf(base_model, lora_rows, repo_owner, repo_name, repo_visibility, hf_
     src = lora_rows
     repo_id = f"{repo_owner}/{repo_name}"
     gr.Info(f"Uploading to Huggingface. Please Stand by...", duration=None)
-    args = Namespace(
+    args = argparse.Namespace(
         huggingface_repo_id=repo_id,
         huggingface_repo_type="model",
         huggingface_repo_visibility=repo_visibility,
@@ -358,11 +358,11 @@ def download(base_model):
         hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="clip_l.safetensors")
 
     # download t5xxl
-    t5xxl_path = os.path.join(clip_folder, "t5xxl_fp16.safetensors")
+    t5xxl_path = os.path.join(clip_folder, f"{t5xxl}.safetensors")
     if not os.path.exists(t5xxl_path):
-        print(f"download t5xxl_fp16.safetensors")
+        print(f"download {t5xxl}.safetensors")
         gr.Info(f"Downloading t5xxl...")
-        hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="t5xxl_fp16.safetensors")
+        hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename=f"{t5xxl}.safetensors")
 
 
 def resolve_path(p):
@@ -448,7 +448,7 @@ def gen_sh(
     pretrained_model_path = resolve_path(model_path)
 
     clip_path = resolve_path("models/clip/clip_l.safetensors")
-    t5_path = resolve_path("models/clip/t5xxl_fp16.safetensors")
+    t5_path = resolve_path(f"models/clip/{t5xxl}.safetensors")
     ae_path = resolve_path("models/vae/ae.sft")
     sh = f"""accelerate launch {line_break}
   --mixed_precision bf16 {line_break}
@@ -1115,5 +1115,26 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     demo.load(fn=loaded, js=js, outputs=[hf_token, hf_login, hf_logout, repo_owner])
     refresh.click(update, inputs=listeners, outputs=[train_script, train_config, dataset_folder])
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--debug", type=bool, default=True)
+    parser.add_argument("--share", type=bool, default=False)
+    parser.add_argument("--show_error", type=bool, default=True)
+    parser.add_argument("--server_name", type=str, default="localhost")
+    parser.add_argument("--server_port", type=int, default=7860)
+    parser.add_argument("--t5xxl", type=str, default="t5xxl_fp16")
+
+    args = parser.parse_args()
+
     cwd = os.path.dirname(os.path.abspath(__file__))
-    demo.launch(debug=True, show_error=True, allowed_paths=[cwd])
+
+    t5xxl = args.t5xxl
+
+    demo.launch(
+        debug=args.debug,
+        show_error=args.show_error,
+        server_name=args.server_name,
+        server_port=args.server_port,
+        share=args.share,
+        allowed_paths=[cwd]
+    )
