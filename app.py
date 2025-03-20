@@ -1080,7 +1080,12 @@ async def train_lora_api(
                         train_config=train_config,
                         sample_prompts="",
                     ):
-                        print(f"Training output: {training_output}")
+                        # Either discard logs entirely
+                        pass
+                        
+                        # Or write to a file instead of stdout
+                        # with open(f"outputs/{output_name}/training.log", "a") as f:
+                        #     f.write(f"{training_output}\n")
                     print("Training process completed")
                 except Exception as e:
                     print(f"Error during training: {str(e)}")
