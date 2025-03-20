@@ -1032,6 +1032,10 @@ async def train_lora_api(
             os.makedirs(dataset_folder, exist_ok=True)
             print(f"Created dataset folder: {dataset_folder}")
             
+            # Copy images from temp_dir to dataset_folder
+            for img_path in image_paths:
+                shutil.copy(img_path, dataset_folder)
+            
             # Create dataset using existing function
             print("Creating dataset...")
             create_dataset(
@@ -1064,26 +1068,33 @@ async def train_lora_api(
             )
             print("Generated training script and config")
 
-            # Start training
-            print("\n=== Starting training process ===")
-            try:
-                # Iterate through the generator
-                for training_output in start_training(
-                    base_model=base_model,
-                    lora_name=lora_name,
-                    train_script=train_script,
-                    train_config=train_config,
-                    sample_prompts="",
-                ):
-                    print(f"Training output: {training_output}")
-                print("Training process completed")
-            except Exception as e:
-                print(f"Error during training: {str(e)}")
-                raise e
+            # Launch training in a separate thread so we can return immediately
+            def run_training_job():
+                try:
+                    print("\n=== Starting training process in background ===")
+                    # Iterate through the generator
+                    for training_output in start_training(
+                        base_model=base_model,
+                        lora_name=lora_name,
+                        train_script=train_script,
+                        train_config=train_config,
+                        sample_prompts="",
+                    ):
+                        print(f"Training output: {training_output}")
+                    print("Training process completed")
+                except Exception as e:
+                    print(f"Error during training: {str(e)}")
+                    print(traceback.format_exc())
+            
+            # Start the training in a background thread
+            import threading
+            training_thread = threading.Thread(target=run_training_job)
+            training_thread.daemon = True  # Allow the thread to be terminated when the main program exits
+            training_thread.start()
 
             return {
                 "status": "success",
-                "message": "Training started",
+                "message": "Training started in background",
                 "lora_name": lora_name,
                 "output_name": output_name,
                 "base_model": base_model,
