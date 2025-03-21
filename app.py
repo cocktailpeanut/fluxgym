@@ -1072,20 +1072,32 @@ async def train_lora_api(
             def run_training_job():
                 try:
                     print("\n=== Starting training process in background ===")
-                    # Iterate through the generator
-                    for training_output in start_training(
-                        base_model=base_model,
-                        lora_name=lora_name,
-                        train_script=train_script,
-                        train_config=train_config,
-                        sample_prompts="",
-                    ):
-                        # Either discard logs entirely
-                        pass
+                    output_name = slugify(lora_name)
+                    
+                    # Open the file once, outside the loop
+                    with open(f"outputs/{output_name}/training.log", "a") as log_file:
+                        last_flush_time = time.time()
+                        flush_interval = 30  # seconds
                         
-                        # Or write to a file instead of stdout
-                        # with open(f"outputs/{output_name}/training.log", "a") as f:
-                        #     f.write(f"{training_output}\n")
+                        # Iterate through the generator
+                        for training_output in start_training(
+                            base_model=base_model,
+                            lora_name=lora_name,
+                            train_script=train_script,
+                            train_config=train_config,
+                            sample_prompts="",
+                        ):
+                            # Write to the already-open file
+                            log_file.write(f"{training_output}\n")
+                            
+                            # Flush every 30 seconds
+                            current_time = time.time()
+                            if current_time - last_flush_time > flush_interval:
+                                log_file.flush()
+                                last_flush_time = current_time
+                                # Optionally print a small indicator to stdout
+                                print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Training in progress... (logs flushed)")
+                            
                     print("Training process completed")
                 except Exception as e:
                     print(f"Error during training: {str(e)}")
@@ -1382,7 +1394,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     )
     concept_sentence.change(fn=update_sample, inputs=[concept_sentence], outputs=sample_prompts)
     start.click(fn=create_dataset, inputs=[dataset_folder, resolution, images] + caption_list, outputs=dataset_folder).then(
-        fn=start_training,
+        fn=run_training_job,
         inputs=[
             base_model,
             lora_name,
