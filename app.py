@@ -28,6 +28,7 @@ import train_network
 import toml
 import re
 import glob
+import threading
 
 MAX_IMAGES = 30
 with open('models.yaml', 'r') as file:
@@ -1069,44 +1070,11 @@ async def train_lora_api(
             print("Generated training script and config")
 
             # Launch training in a separate thread so we can return immediately
-            def run_training_job():
-                try:
-                    print("\n=== Starting training process in background ===")
-                    output_name = slugify(lora_name)
-                    
-                    # Open the file once, outside the loop
-                    with open(f"outputs/{output_name}/training.log", "a") as log_file:
-                        last_flush_time = time.time()
-                        flush_interval = 30  # seconds
-                        
-                        # Iterate through the generator
-                        for training_output in start_training(
-                            base_model=base_model,
-                            lora_name=lora_name,
-                            train_script=train_script,
-                            train_config=train_config,
-                            sample_prompts="",
-                        ):
-                            # Write to the already-open file
-                            log_file.write(f"{training_output}\n")
-                            
-                            # Flush every 30 seconds
-                            current_time = time.time()
-                            if current_time - last_flush_time > flush_interval:
-                                log_file.flush()
-                                last_flush_time = current_time
-                                # Optionally print a small indicator to stdout
-                                print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Training in progress... (logs flushed)")
-                            
-                    print("Training process completed")
-                except Exception as e:
-                    print(f"Error during training: {str(e)}")
-                    print(traceback.format_exc())
-            
-            # Start the training in a background thread
-            import threading
-            training_thread = threading.Thread(target=run_training_job)
-            training_thread.daemon = True  # Allow the thread to be terminated when the main program exits
+            training_thread = threading.Thread(
+                target=run_training_job,
+                args=(base_model, lora_name, train_script, train_config, "")
+            )
+            training_thread.daemon = True
             training_thread.start()
 
             return {
@@ -1394,7 +1362,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     )
     concept_sentence.change(fn=update_sample, inputs=[concept_sentence], outputs=sample_prompts)
     start.click(fn=create_dataset, inputs=[dataset_folder, resolution, images] + caption_list, outputs=dataset_folder).then(
-        fn=run_training_job,
+        fn=start_training,  
         inputs=[
             base_model,
             lora_name,
@@ -1464,3 +1432,45 @@ def upload_latest_lora_to_hf(model_name):
         
     except Exception as e:
         gr.Info(f"Error uploading LoRA to Hugging Face: {str(e)}", duration=None)
+
+def run_training_job(
+    base_model,
+    lora_name,
+    train_script,
+    train_config,
+    sample_prompts,
+):
+    try:
+        print("\n=== Starting training process in background ===")
+        output_name = slugify(lora_name)
+        
+        # Open the file once, outside the loop
+        with open(f"outputs/{output_name}/training.log", "a") as log_file:
+            last_flush_time = time.time()
+            flush_interval = 30  # seconds
+            
+            # Iterate through the generator
+            for training_output in start_training(
+                base_model=base_model,
+                lora_name=lora_name,
+                train_script=train_script,
+                train_config=train_config,
+                sample_prompts=sample_prompts,
+            ):
+                # Write to the already-open file
+                log_file.write(f"{training_output}\n")
+                
+                # Flush every 30 seconds
+                current_time = time.time()
+                if current_time - last_flush_time > flush_interval:
+                    log_file.flush()
+                    last_flush_time = current_time
+                    # Optionally print a small indicator to stdout
+                    print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Training in progress... (logs flushed)")
+        
+        print("Training process completed")
+        return "Training completed successfully."
+    except Exception as e:
+        print(f"Error during training: {str(e)}")
+        print(traceback.format_exc())
+        return f"Error: {str(e)}"
