@@ -1444,8 +1444,12 @@ def run_training_job(
         print("\n=== Starting training process in background ===")
         output_name = slugify(lora_name)
         
+        # Create output directory if it doesn't exist
+        output_dir = f"outputs/{output_name}"
+        os.makedirs(output_dir, exist_ok=True)
+        
         # Open the file once, outside the loop
-        with open(f"outputs/{output_name}/training.log", "a") as log_file:
+        with open(f"{output_dir}/training.log", "a") as log_file:
             last_flush_time = time.time()
             flush_interval = 30  # seconds
             
