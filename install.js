@@ -27,6 +27,7 @@ module.exports = {
         message: [
           "pip uninstall -y diffusers[torch] torch torchaudio torchvision",
           "uv pip install -r requirements.txt",
+          "uv pip install -U bitsandbytes"
         ]
       }
     },
