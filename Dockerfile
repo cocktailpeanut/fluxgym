@@ -30,6 +30,8 @@ RUN pip install --no-cache-dir -r ./requirements.txt
 
 # Install Torch, Torchvision, and Torchaudio for CUDA 12.2
 RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
+# fix for #325
+RUN pip install --upgrade --force-reinstall triton==2.1.0
 
 RUN chown -R appuser:appuser /app
 
