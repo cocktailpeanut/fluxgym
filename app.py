@@ -608,9 +608,9 @@ def start_training(
 
     # Train
     if sys.platform == "win32":
-        command = sh_filepath
+        command = [sh_filepath]
     else:
-        command = f"bash \"{sh_filepath}\""
+        command = ["bash", sh_filepath]
 
     # Use Popen to run the command and capture output in real-time
     env = os.environ.copy()
@@ -619,7 +619,7 @@ def start_training(
     runner = LogsViewRunner()
     cwd = os.path.dirname(os.path.abspath(__file__))
     gr.Info(f"Started training")
-    yield from runner.run_command([command], cwd=cwd)
+    yield from runner.run_command(command, cwd=cwd)
     yield runner.log(f"Runner: {runner}")
 
     # Generate Readme
