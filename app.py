@@ -21,7 +21,8 @@ from argparse import Namespace
 import train_network
 import toml
 import re
-MAX_IMAGES = 150
+# This can be increased if you have >300 images (or >150 images with captions).
+MAX_IMAGES = 300
 
 with open('models.yaml', 'r') as file:
     models = yaml.safe_load(file)
