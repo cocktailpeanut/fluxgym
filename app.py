@@ -533,14 +533,34 @@ keep_tokens = 1
   num_repeats = {num_repeats}"""
     return toml
 
-def update_total_steps(max_train_epochs, num_repeats, images):
+def update_total_steps(max_train_epochs, num_repeats, files):
+    """
+    Re-compute the expected training steps.
+
+    • `files` is the list that comes from the <gr.File> uploader.  
+      It can contain both images and .txt caption files, so we
+      first discard anything that ends in '.txt'.
+
+    • We then multiply the surviving image-count by the repeats
+      and epochs to get the total step estimate.
+    """
     try:
-        num_images = len(images)
+        # keep everything that is *not* a .txt file
+        image_files = [
+            f for f in files
+            if isinstance(f, str)
+            and not f.lower().endswith(".txt")
+        ]
+        num_images = len(image_files)
         total_steps = max_train_epochs * num_images * num_repeats
-        print(f"max_train_epochs={max_train_epochs} num_images={num_images}, num_repeats={num_repeats}, total_steps={total_steps}")
-        return gr.update(value = total_steps)
-    except:
-        print("")
+        print(
+            f"max_train_epochs={max_train_epochs} "
+            f"num_images={num_images}, num_repeats={num_repeats}, "
+            f"total_steps={total_steps}"
+        )
+        return gr.update(value=total_steps)
+    except Exception as e:
+        print("update_total_steps error:", e)
 
 def set_repo(lora_rows):
     selected_name = os.path.basename(lora_rows)
