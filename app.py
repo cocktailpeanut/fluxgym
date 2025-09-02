@@ -21,7 +21,8 @@ from argparse import Namespace
 import train_network
 import toml
 import re
-MAX_IMAGES = 150
+# This can be increased if you have >300 images (or >150 images with captions).
+MAX_IMAGES = 300
 
 with open('models.yaml', 'r') as file:
     models = yaml.safe_load(file)
@@ -515,7 +516,8 @@ def gen_toml(
   dataset_folder,
   resolution,
   class_tokens,
-  num_repeats
+  num_repeats,
+  train_batch_size: int = 1
 ):
     toml = f"""[general]
 shuffle_caption = false
@@ -524,7 +526,7 @@ keep_tokens = 1
 
 [[datasets]]
 resolution = {resolution}
-batch_size = 1
+batch_size = {train_batch_size}
 keep_tokens = 1
 
   [[datasets.subsets]]
@@ -533,14 +535,34 @@ keep_tokens = 1
   num_repeats = {num_repeats}"""
     return toml
 
-def update_total_steps(max_train_epochs, num_repeats, images):
+def update_total_steps(max_train_epochs, num_repeats, files):
+    """
+    Re-compute the expected training steps.
+
+    • `files` is the list that comes from the <gr.File> uploader.  
+      It can contain both images and .txt caption files, so we
+      first discard anything that ends in '.txt'.
+
+    • We then multiply the surviving image-count by the repeats
+      and epochs to get the total step estimate.
+    """
     try:
-        num_images = len(images)
+        # keep everything that is *not* a .txt file
+        image_files = [
+            f for f in files
+            if isinstance(f, str)
+            and not f.lower().endswith(".txt")
+        ]
+        num_images = len(image_files)
         total_steps = max_train_epochs * num_images * num_repeats
-        print(f"max_train_epochs={max_train_epochs} num_images={num_images}, num_repeats={num_repeats}, total_steps={total_steps}")
-        return gr.update(value = total_steps)
-    except:
-        print("")
+        print(
+            f"max_train_epochs={max_train_epochs} "
+            f"num_images={num_images}, num_repeats={num_repeats}, "
+            f"total_steps={total_steps}"
+        )
+        return gr.update(value=total_steps)
+    except Exception as e:
+        print("update_total_steps error:", e)
 
 def set_repo(lora_rows):
     selected_name = os.path.basename(lora_rows)
@@ -658,6 +680,17 @@ def update(
     sample_every_n_steps,
     *advanced_components,
 ):
+    # Extract optional train batch size from advanced flags if present
+    try:
+        advanced_args = dict(zip(advanced_component_ids, advanced_components))
+        tbs_raw = advanced_args.get('--train_batch_size', 1)
+        # Handle empty strings and non-int values gracefully
+        if tbs_raw in (None, ""):
+            train_batch_size = 1
+        else:
+            train_batch_size = int(tbs_raw)
+    except Exception:
+        train_batch_size = 1
     output_name = slugify(lora_name)
     dataset_folder = str(f"datasets/{output_name}")
     sh = gen_sh(
@@ -681,7 +714,8 @@ def update(
         dataset_folder,
         resolution,
         class_tokens,
-        num_repeats
+        num_repeats,
+        train_batch_size
     )
     return gr.update(value=sh), gr.update(value=toml), dataset_folder
 
