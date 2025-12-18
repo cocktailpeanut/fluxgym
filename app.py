@@ -341,12 +341,12 @@ def download(base_model):
 
     # download vae
     vae_folder = "models/vae"
-    vae_path = os.path.join(vae_folder, "ae.sft")
+    vae_path = os.path.join(vae_folder, "ae.safetensors")
     if not os.path.exists(vae_path):
         os.makedirs(vae_folder, exist_ok=True)
         gr.Info(f"Downloading vae")
-        print(f"downloading ae.sft...")
-        hf_hub_download(repo_id="cocktailpeanut/xulf-dev", local_dir=vae_folder, filename="ae.sft")
+        print(f"downloading ae.safetensors...")
+        hf_hub_download(repo_id="cocktailpeanut/xulf-dev", local_dir=vae_folder, filename="ae.safetensors")
 
     # download clip
     clip_folder = "models/clip"
@@ -406,7 +406,11 @@ def gen_sh(
     ############# Sample args ########################
     sample = ""
     if len(sample_prompts) > 0 and sample_every_n_steps > 0:
-        sample = f"""--sample_prompts={sample_prompts_path} --sample_every_n_steps="{sample_every_n_steps}" {line_break}"""
+                #sample = f"""--sample_prompts={sample_prompts_path} --sample_every_n_steps="{sample_every_n_steps}" {line_break}"""
+                sample = (
+                    f"\n  --sample_prompts={sample_prompts_path} "
+                    f'--sample_every_n_steps="{sample_every_n_steps}" {line_break}'
+                )
 
 
     ############# Optimizer args ########################
@@ -449,7 +453,7 @@ def gen_sh(
 
     clip_path = resolve_path("models/clip/clip_l.safetensors")
     t5_path = resolve_path("models/clip/t5xxl_fp16.safetensors")
-    ae_path = resolve_path("models/vae/ae.sft")
+    ae_path = resolve_path("models/vae/ae.safetensors")
     sh = f"""accelerate launch {line_break}
   --mixed_precision bf16 {line_break}
   --num_cpu_threads_per_process 1 {line_break}
