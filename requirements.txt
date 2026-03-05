@@ -8,7 +8,8 @@ pyyaml
 oyaml
 tensorboard
 kornia
-invisible-watermark
+invisible-watermark>=0.2.0
+PyWavelets>=1.6.0
 einops
 accelerate
 toml
