@@ -1,7 +1,7 @@
-# Base image with CUDA 12.2
-FROM nvidia/cuda:12.2.2-base-ubuntu22.04
+# Base image with CUDA 12.6 and Ubuntu 24.04 (Python 3.12 default)
+FROM nvidia/cuda:12.6.0-base-ubuntu24.04
 
-# Install pip if not already installed
+# Install pip and other dependencies
 RUN apt-get update -y && apt-get install -y \
     python3-pip \
     python3-dev \
@@ -11,6 +11,7 @@ RUN apt-get update -y && apt-get install -y \
 # Define environment variables for UID and GID and local timezone
 ENV PUID=${PUID:-1000}
 ENV PGID=${PGID:-1000}
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Create a group with the specified GID
 RUN groupadd -g "${PGID}" appuser
@@ -22,14 +23,13 @@ WORKDIR /app
 # Get sd-scripts from kohya-ss and install them
 RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
     cd sd-scripts && \
+    # Remove -e . from requirements.txt to avoid issues during build
+    sed -i '/-e \./d' requirements.txt && \
     pip install --no-cache-dir -r ./requirements.txt
 
 # Install main application dependencies
 COPY ./requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r ./requirements.txt
-
-# Install Torch, Torchvision, and Torchaudio for CUDA 12.2
-RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
 
 RUN chown -R appuser:appuser /app
 

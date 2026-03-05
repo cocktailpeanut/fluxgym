@@ -13,7 +13,7 @@ einops
 accelerate
 toml
 albumentations
-pydantic
+pydantic==2.9.2
 omegaconf
 k-diffusion
 open_clip_torch
@@ -29,7 +29,9 @@ optimum-quanto
 sentencepiece
 huggingface_hub
 peft
-gradio
+gradio>=4.0.0
 python-slugify
 imagesize
-pydantic==2.9.2
+torch==2.5.1
+torchvision==0.20.1
+torchaudio==2.5.1

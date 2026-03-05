@@ -1,12 +1,17 @@
-# Base image with CUDA 12.4
+# Base image with CUDA 12.4 on Ubuntu 22.04
 FROM nvidia/cuda:12.4.1-base-ubuntu22.04
 
-# Install pip if not already installed
-RUN apt-get update -y && apt-get install -y \
+# Install Python 3.12 and other dependencies
+RUN apt-get update -y && apt-get install -y software-properties-common && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update -y && apt-get install -y \
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
     python3-pip \
-    python3-dev \
     git \
-    build-essential  # Install dependencies for building extensions
+    build-essential && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
 
 # Define environment variables for UID and GID and local timezone
 ENV PUID=${PUID:-1000}
@@ -22,14 +27,13 @@ WORKDIR /app
 # Get sd-scripts from kohya-ss and install them
 RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
     cd sd-scripts && \
-    pip install --no-cache-dir -r ./requirements.txt
+    # Remove -e . from requirements.txt to avoid issues during build
+    sed -i '/-e \./d' requirements.txt && \
+    python3 -m pip install --no-cache-dir -r ./requirements.txt
 
 # Install main application dependencies
 COPY ./requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r ./requirements.txt
-
-# Install Torch, Torchvision, and Torchaudio for CUDA 12.4
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+RUN python3 -m pip install --no-cache-dir -r ./requirements.txt
 
 RUN chown -R appuser:appuser /app
 
