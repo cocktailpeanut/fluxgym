@@ -26,7 +26,7 @@ RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
     # Remove -e . from requirements.txt to avoid issues during build
     sed -i '/-e \./d' requirements.txt && \
     # Install compatible versions beforehand for Python 3.12 compatibility
-    pip install --no-cache-dir "scipy>=1.13.1" "PyWavelets>=1.6.0" "invisible-watermark>=0.2.0" && \
+    pip install --no-cache-dir "scipy>=1.13.1" "PyWavelets>=1.6.0" "invisible-watermark>=0.2.0" "transformers>=4.42.0" && \
     pip install --no-cache-dir -r ./requirements.txt
 
 # Install main application dependencies
