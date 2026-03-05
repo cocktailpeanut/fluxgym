@@ -25,6 +25,8 @@ RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
     cd sd-scripts && \
     # Remove -e . from requirements.txt to avoid issues during build
     sed -i '/-e \./d' requirements.txt && \
+    # Install scipy>=1.13.1 beforehand to ensure Python 3.12 compatibility
+    pip install --no-cache-dir "scipy>=1.13.1" && \
     pip install --no-cache-dir -r ./requirements.txt
 
 # Install main application dependencies
