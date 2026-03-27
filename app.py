@@ -535,6 +535,12 @@ keep_tokens = 1
 
 def update_total_steps(max_train_epochs, num_repeats, images):
     try:
+        # only count real image files
+        img_exts = {'.jpg','.jpeg','.png','.bmp','.gif','.webp'}
+        num_images = sum(
+            1 for path in images
+            if os.path.splitext(path)[1].lower() in img_exts
+        )
         num_images = len(images)
         total_steps = max_train_epochs * num_images * num_repeats
         print(f"max_train_epochs={max_train_epochs} num_images={num_images}, num_repeats={num_repeats}, total_steps={total_steps}")
