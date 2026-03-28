@@ -200,7 +200,7 @@ def load_captioning(uploaded_files, concept_sentence):
         if(image_value):
             base_name = os.path.splitext(os.path.basename(image_value))[0]
             if base_name in txt_files_dict:
-                with open(txt_files_dict[base_name], 'r') as file:
+                with open(txt_files_dict[base_name], 'r', encoding='utf-8') as file:
                     corresponding_caption = file.read()
 
         # Update value of captioning area
