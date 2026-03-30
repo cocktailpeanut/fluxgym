@@ -29,7 +29,7 @@ module.exports = {
     params: {
       venv: "env",
       message: [
-        "pip uninstall -y diffusers[torch] torch torchaudio torchvision",
+        "uv pip uninstall diffusers[torch] torch",
         "uv pip install -r requirements.txt",
       ]
     }
@@ -41,11 +41,6 @@ module.exports = {
         venv: "env",
         // xformers: true   // uncomment this line if your project requires xformers
       }
-    }
-  }, {
-    method: "fs.link",
-    params: {
-      venv: "env"
     }
   }]
 }
