@@ -30,6 +30,7 @@ optimum-quanto
 sentencepiece
 huggingface_hub
 peft
+gradio>=4.0.0
 python-slugify
 imagesize
 torch==2.5.1
