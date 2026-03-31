@@ -406,7 +406,8 @@ def gen_sh(
     ############# Sample args ########################
     sample = ""
     if len(sample_prompts) > 0 and sample_every_n_steps > 0:
-        sample = f"""--sample_prompts={sample_prompts_path} --sample_every_n_steps="{sample_every_n_steps}" {line_break}"""
+        # ensure the sample args appear on a new line in the generated script
+        sample = f"\n  --sample_prompts={sample_prompts_path} --sample_every_n_steps=\"{sample_every_n_steps}\" {line_break}"
 
 
     ############# Optimizer args ########################
@@ -515,7 +516,8 @@ def gen_toml(
   dataset_folder,
   resolution,
   class_tokens,
-  num_repeats
+  num_repeats,
+  train_batch_size=1  # Add default value for backward compatibility
 ):
     toml = f"""[general]
 shuffle_caption = false
@@ -524,7 +526,7 @@ keep_tokens = 1
 
 [[datasets]]
 resolution = {resolution}
-batch_size = 1
+batch_size = {train_batch_size}
 keep_tokens = 1
 
   [[datasets.subsets]]
@@ -658,6 +660,10 @@ def update(
     sample_every_n_steps,
     *advanced_components,
 ):
+    # Map advanced_component_ids to their values
+    advanced_args = dict(zip(advanced_component_ids, advanced_components))
+    # Default to 1 if not set
+    train_batch_size = advanced_args.get('--train_batch_size', 1)
     output_name = slugify(lora_name)
     dataset_folder = str(f"datasets/{output_name}")
     sh = gen_sh(
@@ -681,7 +687,8 @@ def update(
         dataset_folder,
         resolution,
         class_tokens,
-        num_repeats
+        num_repeats,
+        train_batch_size  # Pass the batch size here
     )
     return gr.update(value=sh), gr.update(value=toml), dataset_folder
 
