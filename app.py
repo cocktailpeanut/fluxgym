@@ -406,8 +406,11 @@ def gen_sh(
     ############# Sample args ########################
     sample = ""
     if len(sample_prompts) > 0 and sample_every_n_steps > 0:
-        sample = f"""--sample_prompts={sample_prompts_path} --sample_every_n_steps="{sample_every_n_steps}" {line_break}"""
-
+        #sample = f"""--sample_prompts={sample_prompts_path} --sample_every_n_steps="{sample_every_n_steps}" {line_break}"""
+        sample = (
+            f"\n  --sample_prompts={sample_prompts_path} "
+            f'--sample_every_n_steps="{sample_every_n_steps}" {line_break}'
+        )
 
     ############# Optimizer args ########################
 #    if vram == "8G":
