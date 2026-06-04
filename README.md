@@ -35,13 +35,70 @@ FluxGym supports 100% of Kohya sd-scripts features through an [Advanced](#advanc
 1. Flux1-dev
 2. Flux1-dev2pro (as explained here: https://medium.com/@zhiwangshi28/why-flux-lora-so-hard-to-train-and-how-to-overcome-it-a0c70bc59eaf)
 3. Flux1-schnell (Couldn't get high quality results, so not really recommended, but feel free to experiment with it)
-4. More?
+4. Flux1-Krea-dev (select `flux-krea-dev` in the dropdown — see note below)
+5. More?
+
+### Training FLUX.1 Krea [dev]
+
+FLUX.1 Krea is architecturally a sibling of FLUX.1-dev (same VAE / CLIP-L / T5
+encoders, guidance-distilled), so it trains with the exact same recipe — the
+`flux-krea-dev` entry in [models.yaml](models.yaml) is all that's needed.
+
+Two things to know:
+
+- It uses the **full bf16 single-file checkpoint** (`InvokeAI/FLUX.1-Krea-dev`).
+  Do **not** point it at the ComfyUI `fp8_scaled` file — that trains to pure
+  noise ([kohya-ss/sd-scripts#2166](https://github.com/kohya-ss/sd-scripts/issues/2166)).
+  FluxGym already quantizes on the GPU via `--fp8_base`.
+- Because Krea is guidance-distilled, keep `--guidance_scale 1.0` (the default).
+  Higher values destroy the distilled guidance embedding during training.
+
+Optional alternative route: train the LoRA on `bdsqlsz/flux1-dev2pro-single`
+(a de-distilled base, cleaner gradient signal) and run the resulting LoRA on
+Krea at inference. LoRAs are portable across the FLUX.1-dev family. Quality of
+this transfer isn't guaranteed (Krea's weights have drifted aesthetically from
+dev), so A/B test it against training directly on `flux-krea-dev`.
 
 The models are automatically downloaded when you start training with the model selected.
 
 You can easily add more to the supported models list by editing the [models.yaml](models.yaml) file. If you want to share some interesting base models, please send a PR.
 
 ---
+
+# Remote training on RunPod (local UI → cloud GPU)
+
+You can run the FluxGym UI locally (e.g. on a Mac with no NVIDIA GPU) while the
+actual training runs on a RunPod serverless GPU. The dataset is sent with each
+job, base models are cached on a RunPod network volume, and the finished LoRA is
+pushed to your HuggingFace account.
+
+It's opt-in: if `RUNPOD_API_KEY` and `RUNPOD_ENDPOINT_ID` are absent from `.env`,
+FluxGym trains locally exactly as before.
+
+**Setup:**
+
+0. The `runpod` SDK is in `requirements.txt` — if you're upgrading an existing
+   install, re-run `pip install -r requirements.txt` so it's available locally.
+1. `cp .env.example .env` and fill in `RUNPOD_API_KEY`, `DOCKER_IMAGE`
+   (your registry path), and `HF_TOKEN` + `HF_REPO_OWNER`.
+2. Build & push the worker image:
+   ```
+   ./runpod/build_and_push.sh
+   ```
+3. Provision the volume + template + endpoint:
+   ```
+   python runpod/deploy.py
+   ```
+   Paste the printed `RUNPOD_ENDPOINT_ID` and `RUNPOD_NETWORK_VOLUME_ID` into `.env`.
+   In the RunPod dashboard, raise the endpoint's **Execution Timeout** to cover
+   your longest run.
+4. Start FluxGym locally (`python app.py`), configure your LoRA as usual, and
+   click **Start training** — logs stream back from the GPU into the terminal,
+   and the LoRA lands in `https://huggingface.co/<owner>/<lora-name>`.
+
+The first job downloads ~30GB of base models to the volume and is slow; later
+jobs reuse the cache. See [`runpod/`](runpod/) for the handler, deploy, and
+build scripts, and [Dockerfile.runpod](Dockerfile.runpod) for the worker image.
 
 # How people are using Fluxgym
 

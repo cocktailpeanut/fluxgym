@@ -25,3 +25,14 @@ bdsqlsz/flux1-dev2pro-single:
     license_name: flux-1-dev-non-commercial-license
     license_link: https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/LICENSE.md
     file: flux1-dev2pro.safetensors
+# FLUX.1 Krea [dev]. Use the full bf16 single-file checkpoint (NOT the ComfyUI
+# fp8_scaled file, which trains to noise - see kohya-ss/sd-scripts#2166).
+# Krea is guidance-distilled like flux-dev, so the default --guidance_scale 1.0
+# recipe applies unchanged.
+flux-krea-dev:
+    repo: InvokeAI/FLUX.1-Krea-dev
+    base: black-forest-labs/FLUX.1-Krea-dev
+    license: other
+    license_name: flux-1-dev-non-commercial-license
+    license_link: https://huggingface.co/black-forest-labs/FLUX.1-Krea-dev/blob/main/LICENSE.md
+    file: flux1-krea-dev.safetensors

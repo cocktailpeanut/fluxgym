@@ -1,0 +1,2 @@
+# Extra deps for the RunPod serverless worker (on top of requirements.txt).
+runpod>=1.6.0

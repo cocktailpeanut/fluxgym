@@ -1,0 +1,41 @@
+# RunPod serverless image for FluxGym remote training.
+# Unlike the stock Dockerfile, this KEEPS sd-scripts in the image (the worker
+# runs sd-scripts/flux_train_network.py at runtime and there is no bind-mount
+# on serverless) and launches the training handler instead of the Gradio UI.
+FROM nvidia/cuda:12.4.1-base-ubuntu22.04
+
+RUN apt-get update -y && apt-get install -y \
+    python3-pip \
+    python3-dev \
+    git \
+    build-essential
+
+WORKDIR /app
+
+# Clone Kohya sd-scripts (sd3 branch) and install its deps. KEEP the directory.
+RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
+    cd sd-scripts && \
+    pip install --no-cache-dir -r ./requirements.txt
+
+# Install FluxGym app deps + the RunPod SDK.
+COPY ./requirements.txt ./requirements.txt
+COPY ./requirements-runpod.txt ./requirements-runpod.txt
+RUN pip install --no-cache-dir -r ./requirements.txt && \
+    pip install --no-cache-dir -r ./requirements-runpod.txt
+
+# Torch for CUDA 12.4.
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# Copy the FluxGym application code into the repo root, then move sd-scripts in
+# so it sits at /app/fluxgym/sd-scripts (where handler.py expects it).
+COPY . /app/fluxgym
+RUN cp -r /app/sd-scripts /app/fluxgym/sd-scripts
+
+WORKDIR /app/fluxgym
+
+ENV HF_HUB_ENABLE_HF_TRANSFER=1
+ENV PYTHONUNBUFFERED=1
+
+# entrypoint wires the network volume to ./models, then starts the worker.
+RUN chmod +x /app/fluxgym/runpod/entrypoint.sh
+ENTRYPOINT ["/app/fluxgym/runpod/entrypoint.sh"]

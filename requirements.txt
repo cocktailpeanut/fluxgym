@@ -34,3 +34,4 @@ python-slugify
 imagesize
 pydantic==2.9.2
 starlette==0.50.0
+runpod>=1.6.0
