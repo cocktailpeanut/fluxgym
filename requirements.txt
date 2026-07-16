@@ -1,5 +1,5 @@
 safetensors
-git+https://github.com/huggingface/diffusers.git
+diffusers==0.38.0
 gradio_logsview@https://huggingface.co/spaces/cocktailpeanut/gradio_logsview/resolve/main/gradio_logsview-0.0.17-py3-none-any.whl
 transformers==4.49.0
 lycoris-lora==1.8.3
