@@ -22,7 +22,13 @@ services:
       resources:
         reservations:
           devices:
-          - driver: nvidia
-            count: all
-            capabilities: [gpu]
+            - driver: nvidia
+              device_ids:
+                - "0"          # Use only GPU with index 1
+              capabilities: [gpu]
+          memory: 32g           # Optional: Reserve 32 GB RAM
+        limits:
+          memory: 32g           # Max RAM usage
+    memswap_limit: 40g          # Total allowed memory+swap (48g RAM + 12g swap)
     restart: unless-stopped
+    #shm_size: "8g"
