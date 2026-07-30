@@ -14,3 +14,6 @@ venv/
 **/.vscode
 **/*.ps1
 sd-scripts/
+outputs/*
+models/*
+datasets/*
