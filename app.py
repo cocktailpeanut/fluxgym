@@ -231,25 +231,32 @@ def resize_image(image_path, output_path, size):
 
 def create_dataset(destination_folder, size, *inputs):
     print("Creating dataset")
-    images = inputs[0]
+    files = inputs[0]
     if not os.path.exists(destination_folder):
         os.makedirs(destination_folder)
 
-    for index, image in enumerate(images):
+    # The uploader returns images and caption .txt files in one list, but the
+    # caption textboxes are one per image. Indexing captions by the raw file
+    # position shifts every caption after a .txt (and can pass None into
+    # file.write). Copy caption files first so an uploaded .txt is kept, then
+    # pair the remaining images with textboxes in image order.
+    for file in files:
+        ext = os.path.splitext(file)[-1].lower()
+        if ext == '.txt':
+            shutil.copy(file, destination_folder)
+
+    image_files = [f for f in files if os.path.splitext(f)[-1].lower() != '.txt']
+    for index, image in enumerate(image_files):
         # copy the images to the datasets folder
         new_image_path = shutil.copy(image, destination_folder)
-
-        # if it's a caption text file skip the next bit
-        ext = os.path.splitext(new_image_path)[-1].lower()
-        if ext == '.txt':
-            continue
 
         # resize the images
         resize_image(new_image_path, new_image_path, size)
 
         # copy the captions
-
-        original_caption = inputs[index + 1]
+        original_caption = inputs[index + 1] if index + 1 < len(inputs) else ""
+        if original_caption is None:
+            original_caption = ""
 
         image_file_name = os.path.basename(new_image_path)
         caption_file_name = os.path.splitext(image_file_name)[0] + ".txt"
